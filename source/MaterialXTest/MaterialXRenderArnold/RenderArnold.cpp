@@ -126,7 +126,7 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
             shaderPath = mx::FilePath(outputFilePath) / mx::FilePath(shaderName + "_arnold");
 
             // Write out osl file
-            if (testOptions.dumpGeneratedCode)
+            //if (testOptions.dumpGeneratedCode)
             {
                 RenderUtil::AdditiveScopedTimer ioTimer(profileTimes.languageTimes.ioTime, "Arnold I/O time");
                 std::ofstream file;
@@ -136,7 +136,47 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
             }
 
             // TODO: Validate compilation using Arnold's OSL compiler (oslc).
-            // TODO: Validate rendering using Arnold's command line renderer (kick).
+
+            // Run kick to test osl shaders
+            // "arnold_oslTemplate.ass".
+            std::string testRenderer; //  (MATERIALX_ARNOLD_EXECUTABLE);
+            if (testRenderer.empty())
+            {
+                testRenderer = "d:/Work/arnold/Arnold - SDK/bin/kick";
+            }
+            if (!testRenderer.empty())
+            {
+                const std::string testOSL = shaderPath + ".osl";
+                const std::string renderOSL = shaderPath + ".png";
+                const std::string testAssFile;
+                const std::string inputArgs = " -ib --as 4 -i " + testAssFile;
+                const std::string outputArgs = " -r 512 512 -of png -dw -o " + renderOSL;
+                const std::string setParameters = " -set osl.shadername " + shaderName;
+
+                std::string errorFile(shaderPath.asString() + "_compile_errors.txt");
+                const std::string redirectString(" 2>&1");
+
+                std::string command =
+                    testRenderer + inputArgs + setParameters + outputArgs
+                    + " > " + errorFile + redirectString;
+                int returnValue = std::system(command.c_str());
+
+                std::ifstream errorStream(errorFile);
+                std::string result;
+                result.assign(std::istreambuf_iterator<char>(errorStream),
+                              std::istreambuf_iterator<char>());
+
+                if (!result.empty())
+                {
+                    const std::string errorType("Arnold log.");
+                    mx::StringVec errors;
+                    errors.push_back("Command string: " + command);
+                    errors.push_back("Command return code: " + std::to_string(returnValue));
+                    errors.push_back("Shader failed to compile:");
+                    errors.push_back(result);
+                    //throw mx::ExceptionShaderRenderError(errorType, errors);
+                }
+            }
         }
     }
 
