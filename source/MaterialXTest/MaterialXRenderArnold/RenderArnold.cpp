@@ -135,30 +135,31 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
                 file.close();
             }
 
-            // TODO: Validate compilation using Arnold's OSL compiler (oslc).
-
             // Run kick to test osl shaders
             // "arnold_oslTemplate.ass".
             std::string testRenderer; //  (MATERIALX_ARNOLD_EXECUTABLE);
             if (testRenderer.empty())
             {
-                testRenderer = "d:/Work/arnold/Arnold - SDK/bin/kick";
+                testRenderer = "\"C:/Program Files/Autodesk/Arnold/maya2020/bin/kick\"";
             }
             if (!testRenderer.empty())
             {
+                //-r 512 512 - as 1 - i brick_nodedef_image_test.ass  of png -dw - o brick_nodedef_image_test.png
                 const std::string testOSL = shaderPath + ".osl";
                 const std::string renderOSL = shaderPath + ".png";
                 const std::string testAssFile;
-                const std::string inputArgs = " -ib --as 4 -i " + testAssFile;
+                const std::string inputArgs = " -ib --as 1 -i " + testAssFile;
                 const std::string outputArgs = " -r 512 512 -of png -dw -o " + renderOSL;
                 const std::string setParameters = " -set osl.shadername " + shaderName;
 
-                std::string errorFile(shaderPath.asString() + "_compile_errors.txt");
+                std::string errorFile(shaderPath + "_compile_errors.txt");
                 const std::string redirectString(" 2>&1");
 
                 std::string command =
                     testRenderer + inputArgs + setParameters + outputArgs
                     + " > " + errorFile + redirectString;
+                log << command << std::endl;
+                std::cout << command << std::endl;
                 int returnValue = std::system(command.c_str());
 
                 std::ifstream errorStream(errorFile);
@@ -174,7 +175,6 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
                     errors.push_back("Command return code: " + std::to_string(returnValue));
                     errors.push_back("Shader failed to compile:");
                     errors.push_back(result);
-                    //throw mx::ExceptionShaderRenderError(errorType, errors);
                 }
             }
         }
