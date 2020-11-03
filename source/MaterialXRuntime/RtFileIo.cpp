@@ -15,6 +15,7 @@
 #include <MaterialXRuntime/RtTypeDef.h>
 #include <MaterialXRuntime/RtTraversal.h>
 #include <MaterialXRuntime/RtApi.h>
+#include <MaterialXRuntime/RtLogger.h>
 
 #include <MaterialXRuntime/Private/PvtStage.h>
 
@@ -37,7 +38,10 @@ namespace
                                                     RtToken("nodegraph"), RtToken("interfacename") };
     static const RtTokenSet nodeMetadata        = { RtToken("name"), RtToken("type"), RtToken("node") };
     static const RtTokenSet nodegraphMetadata   = { RtToken("name") };
-    static const RtTokenSet lookMetadata        = { RtToken("name") };
+    static const RtTokenSet lookMetadata        = { RtToken("name"), RtToken("inherit") };
+    static const RtTokenSet lookGroupMetadata   = { RtToken("name"), RtToken("looks"), RtToken("default") };
+    static const RtTokenSet mtrlAssignMetadata  = { RtToken("name"), RtToken("geom"), RtToken("collection"), RtToken("material"), RtToken("exclusive") };
+    static const RtTokenSet collectionMetadata  = { RtToken("name"), RtToken("includegeom"), RtToken("includecollection"), RtToken("excludegeom") };
     static const RtTokenSet genericMetadata     = { RtToken("name"), RtToken("kind") };
     static const RtTokenSet stageMetadata       = {};
 
@@ -488,7 +492,7 @@ namespace
         collection.getIncludeGeom().setValueString(src->getIncludeGeom());
         collection.getExcludeGeom().setValueString(src->getExcludeGeom());
 
-        readMetadata(src, collectionPrim, lookMetadata);
+        readMetadata(src, collectionPrim, collectionMetadata);
 
         return collectionPrim;
     }
@@ -528,14 +532,16 @@ namespace
             mapper.addMapping(parent, matAssignName, assignPrim->getName());
             RtMaterialAssign rtMatAssign(assignPrim->hnd());
             
-            if (!matAssign->getCollectionString().empty()) {
+            if (!matAssign->getCollectionString().empty())
+            {
                 PvtPrim* collection = findPrimOrThrow(RtToken(matAssign->getCollectionString()), parent, mapper);
                 rtMatAssign.getCollection().addTarget(collection->hnd());
             }
 
-            if (!matAssign->getMaterial().empty()) {
+            if (!matAssign->getMaterial().empty())
+            {
                 PvtPrim* material = findPrimOrThrow(RtToken(matAssign->getMaterial()), parent, mapper);
-                rtMatAssign.getMaterial().addTarget(material->hnd());
+                rtMatAssign.getMaterial().connect(material->prim().getOutput());
             }
 
             if (matAssign->hasAttribute(MaterialAssign::EXCLUSIVE_ATTRIBUTE)) {
@@ -546,7 +552,7 @@ namespace
 
             rtMatAssign.getGeom().getValue().asString() = matAssign->getActiveGeom();
 
-            readMetadata(matAssign, assignPrim, lookMetadata);
+            readMetadata(matAssign, assignPrim, mtrlAssignMetadata);
 
             look.getMaterialAssigns().addTarget(assignPrim->hnd());
         }
@@ -598,7 +604,7 @@ namespace
         const string& activeLook = src->getActiveLook();
         lookGroup.getActiveLook().setValueString(activeLook);
 
-        readMetadata(src, prim, lookMetadata);
+        readMetadata(src, prim, lookGroupMetadata);
 
         return prim;
     }
@@ -1007,7 +1013,7 @@ namespace
                 string includeList = rtIncludeCollection.getTargetsAsString();                
                 collection->setIncludeCollectionString(includeList);
 
-                writeMetadata(prim, collection, lookMetadata, options);
+                writeMetadata(prim, collection, collectionMetadata, options);
             }
         }
     }
@@ -1048,20 +1054,21 @@ namespace
                     }
 
                     MaterialAssignPtr massign = look->addMaterialAssign(assignName);
-
                     massign->setExclusive(rtMatAssign.getExclusive().getValue().asBool());
+                    massign->setGeom(rtMatAssign.getGeom().getValueString());
+
                     auto iter = rtMatAssign.getCollection().getTargets();
-                    if (!iter.isDone()) {
+                    if (!iter.isDone())
+                    {
                         massign->setCollectionString((*iter).getName());
                     }
 
-                    iter = rtMatAssign.getMaterial().getTargets();
-                    if (!iter.isDone()) {
-                        massign->setMaterial((*iter).getName());
+                    if (rtMatAssign.getMaterial().isConnected())
+                    {
+                        massign->setMaterial(rtMatAssign.getMaterial().getConnection().getParent().getName());
                     }
-                    massign->setGeom(rtMatAssign.getGeom().getValueString());
 
-                    writeMetadata(pprim, massign, lookMetadata, options);
+                    writeMetadata(pprim, massign, mtrlAssignMetadata, options);
                 }
 
                 writeMetadata(prim, look, lookMetadata, options);
@@ -1091,7 +1098,7 @@ namespace
                 lookGroup->setLooks(lookList);
                 lookGroup->setActiveLook(rtLookGroup.getActiveLook().getValueString());
 
-                writeMetadata(prim, lookGroup, lookMetadata, options);
+                writeMetadata(prim, lookGroup, lookGroupMetadata, options);
             }
         }
     }
@@ -1353,17 +1360,24 @@ void RtFileIo::readLibraries(const FilePathVec& libraryPaths, const FileSearchPa
             continue;
         }
 
-        if (elem->isA<Node>())
+        try
         {
-            readNode(elem->asA<Node>(), stage->getRootPrim(), stage, mapper);
+            if (elem->isA<Node>())
+            {
+                readNode(elem->asA<Node>(), stage->getRootPrim(), stage, mapper); 
+            }
+            else if (elem->isA<NodeGraph>())
+            {
+                readNodeGraph(elem->asA<NodeGraph>(), stage->getRootPrim(), stage, mapper);
+            }
+            else
+            {
+                readGenericPrim(elem, stage->getRootPrim(), stage, mapper);
+            }
         }
-        else if (elem->isA<NodeGraph>())
+        catch(const ExceptionRuntimeError &e)
         {
-            readNodeGraph(elem->asA<NodeGraph>(), stage->getRootPrim(), stage, mapper);
-        }
-        else
-        {
-            readGenericPrim(elem, stage->getRootPrim(), stage, mapper);
+            RtApi::get().log(RtLogger::ERROR, e.what());
         }
     }
 }
