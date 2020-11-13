@@ -57,7 +57,7 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
                                             std::ostream& log,
                                             const GenShaderUtil::TestSuiteOptions& testOptions,
                                             RenderUtil::RenderProfileTimes& profileTimes,
-                                            const mx::FileSearchPath& /*imageSearchPath*/,
+                                            const mx::FileSearchPath& imageSearchPath,
                                             const std::string& outputPath,
                                             mx::ImageVec* /*returnImage*/)
 {
@@ -82,6 +82,9 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
     if (element && doc)
     {
         log << "------------ Run OSL validation with element: " << element->getNamePath() << "-------------------" << std::endl;
+        mx::FilePath oslTemplateFile = mx::FilePath::getCurrentPath() / mx::FilePath("resources/Materials/TestSuite/Utilities/arnold_oslTemplate.ass");
+        //mx::FilePath envMapFile = mx::FilePath::getCurrentPath() / testOptions.radianceIBLPath;
+        mx::FilePath envMapFile = testOptions.radianceIBLPath;
 
         for (const auto& options : optionsList)
         {
@@ -135,46 +138,46 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
                 file.close();
             }
 
-            // Run kick to test osl shaders
-            // "arnold_oslTemplate.ass".
-            std::string testRenderer; //  (MATERIALX_ARNOLD_EXECUTABLE);
-            if (testRenderer.empty())
+            if (testOptions.renderImages)
             {
-                testRenderer = "\"C:/Program Files/Autodesk/Arnold/maya2020/bin/kick\"";
-            }
-            if (!testRenderer.empty())
-            {
-                //-r 512 512 - as 1 - i brick_nodedef_image_test.ass  of png -dw - o brick_nodedef_image_test.png
-                const std::string testOSL = shaderPath + ".osl";
-                const std::string renderOSL = shaderPath + ".png";
-                const std::string testAssFile;
-                const std::string inputArgs = " -ib --as 1 -i " + testAssFile;
-                const std::string outputArgs = " -r 512 512 -of png -dw -o " + renderOSL;
-                const std::string setParameters = " -set osl.shadername " + shaderName;
-
-                std::string errorFile(shaderPath + "_compile_errors.txt");
-                const std::string redirectString(" 2>&1");
-
-                std::string command =
-                    testRenderer + inputArgs + setParameters + outputArgs
-                    + " > " + errorFile + redirectString;
-                log << command << std::endl;
-                std::cout << command << std::endl;
-                int returnValue = std::system(command.c_str());
-
-                std::ifstream errorStream(errorFile);
-                std::string result;
-                result.assign(std::istreambuf_iterator<char>(errorStream),
-                              std::istreambuf_iterator<char>());
-
-                if (!result.empty())
+                // Run kick to test osl shaders with template file: "arnold_oslTemplate.ass".
+                std::string testRenderer("\"" + std::string(MATERIALX_ARNOLD_EXECUTABLE) + "\"");
+                
+                if (!testRenderer.empty())
                 {
-                    const std::string errorType("Arnold log.");
-                    mx::StringVec errors;
-                    errors.push_back("Command string: " + command);
-                    errors.push_back("Command return code: " + std::to_string(returnValue));
-                    errors.push_back("Shader failed to compile:");
-                    errors.push_back(result);
+                    //-r 512 512 - as 1 - i brick_nodedef_image_test.ass  of png -dw - o brick_nodedef_image_test.png
+                    const std::string renderOSL = shaderPath + ".png";
+                    const std::string inputArgs = " -ib -as 1 -i " + oslTemplateFile.asString();
+                    const std::string outputArgs = " -r 512 512 -of png -dw -o " + renderOSL;
+                    std::string setParameters;
+                    setParameters += " -set osl.shadername \"" + shaderPath + "\"";
+                    setParameters += " -set /Map__env_image.filename \"" + envMapFile.asString() + "\"";
+                    setParameters += " -set options.texture_searchpath \"" + imageSearchPath.asString() + "\"";
+
+                    std::string errorFile(shaderPath + "_compile_errors.txt");
+                    const std::string redirectString(" 2>&1");
+
+                    std::string command =
+                        testRenderer + inputArgs + setParameters + outputArgs
+                        + " > " + errorFile + redirectString;
+                    log << command << std::endl;
+                    std::cout << command << std::endl;
+                    int returnValue = std::system(command.c_str());
+
+                    std::ifstream errorStream(errorFile);
+                    std::string result;
+                    result.assign(std::istreambuf_iterator<char>(errorStream),
+                        std::istreambuf_iterator<char>());
+
+                    if (!result.empty())
+                    {
+                        const std::string errorType("Arnold log.");
+                        mx::StringVec errors;
+                        errors.push_back("Command string: " + command);
+                        errors.push_back("Command return code: " + std::to_string(returnValue));
+                        errors.push_back("Shader failed to compile:");
+                        errors.push_back(result);
+                    }
                 }
             }
         }
