@@ -861,7 +861,10 @@ void ShaderGeneratorTester::validate(const mx::GenOptions& generateOptions, cons
                         }
                         else
                         {
-                            path = path / (elementName + "." + getFileExtensionForLanguage(_shaderGenerator->getLanguage()));
+                            path = path / (elementName + "."  
+                                + _shaderGenerator->getTarget() 
+                                + "." + getFileExtensionForLanguage(_shaderGenerator->getLanguage())
+                                );
                             sourceCodePaths.push_back(path);
                             std::ofstream file(path.asString());
                             _logFile << "Write source code: " << path.asString() << std::endl;
@@ -982,6 +985,9 @@ bool TestSuiteOptions::readOptions(const std::string& optionFile)
     const std::string WEDGE_RANGE_MIN("wedgeRangeMin");
     const std::string WEDGE_RANGE_MAX("wedgeRangeMax");
     const std::string WEDGE_STEPS("wedgeSteps");
+    const std::string BAKE_FILES("bakeFiles");
+    const std::string BAKE_HDRS("bakeHdrs");
+    const std::string BAKE_RESOLUTIONS("bakeResolutions");
 
     overrideFiles.clear();
     dumpGeneratedCode = false;
@@ -1112,7 +1118,6 @@ bool TestSuiteOptions::readOptions(const std::string& optionFile)
                             externalTestPaths.append(mx::FilePath(l));
                         }
                     }
-
                     else if (name == WEDGE_FILES)
                     {
                         wedgeFiles = mx::splitString(p->getValueString(), ",");
@@ -1132,6 +1137,18 @@ bool TestSuiteOptions::readOptions(const std::string& optionFile)
                     else if (name == WEDGE_RANGE_MAX)
                     {
                         wedgeRangeMax = val->asA<mx::FloatVec>();
+                    }
+                    else if (name == BAKE_FILES)
+                    {
+                        bakeFiles = mx::splitString(p->getValueString(), ",");
+                    }
+                    else if (name == BAKE_RESOLUTIONS)
+                    {
+                        bakeResolutions = val->asA<mx::IntVec>();
+                    }
+                    else if (name == BAKE_HDRS)
+                    {
+                        bakeHdrs = val->asA<mx::BoolVec>();
                     }
                     else if (name == APPLY_LATEST_UPDATES)
                     {
