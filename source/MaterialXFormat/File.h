@@ -191,6 +191,9 @@ class FilePath
     /// Create a directory on the file system at the given path.
     void createDirectory() const;
 
+    /// Set the current working directory of the file system.
+    void setCurrentPath();
+
     /// @}
 
     /// Return the current working directory of the file system.

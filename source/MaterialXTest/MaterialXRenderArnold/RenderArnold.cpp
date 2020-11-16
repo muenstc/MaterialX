@@ -82,9 +82,9 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
     if (element && doc)
     {
         log << "------------ Run OSL validation with element: " << element->getNamePath() << "-------------------" << std::endl;
-        mx::FilePath oslTemplateFile = mx::FilePath::getCurrentPath() / mx::FilePath("resources/Materials/TestSuite/Utilities/arnold_oslTemplate.ass");
-        //mx::FilePath envMapFile = mx::FilePath::getCurrentPath() / testOptions.radianceIBLPath;
-        mx::FilePath envMapFile = testOptions.radianceIBLPath;
+        mx::FilePath currentPath = mx::FilePath::getCurrentPath();
+        mx::FilePath oslTemplateFile = currentPath / mx::FilePath("resources/Materials/TestSuite/Utilities/arnold_oslTemplate.ass");
+        mx::FilePath envMapFile = mx::FilePath::getCurrentPath() / testOptions.radianceIBLPath;
 
         for (const auto& options : optionsList)
         {
@@ -112,7 +112,7 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
             }
             CHECK(shader->getSourceCode().length() > 0);
 
-            std::string shaderPath;
+            mx::FilePath shaderPath;
             mx::FilePath outputFilePath = outputPath;
             // Use separate directory for reduced output
             if (options.shaderInterfaceType == mx::SHADER_INTERFACE_REDUCED)
@@ -126,14 +126,15 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
                 outputFilePath.createDirectory();
             }
 
-            shaderPath = mx::FilePath(outputFilePath) / mx::FilePath(shaderName + "_arnold");
+            const std::string& arnoldShaderName = mx::FilePath(shaderName + "_arnold");
+            shaderPath = mx::FilePath(outputFilePath) / arnoldShaderName;
 
             // Write out osl file
             //if (testOptions.dumpGeneratedCode)
             {
                 RenderUtil::AdditiveScopedTimer ioTimer(profileTimes.languageTimes.ioTime, "Arnold I/O time");
                 std::ofstream file;
-                file.open(shaderPath + ".osl");
+                file.open(shaderPath.asString() + ".osl");
                 file << shader->getSourceCode();
                 file.close();
             }
@@ -141,28 +142,32 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
             if (testOptions.renderImages)
             {
                 // Run kick to test osl shaders with template file: "arnold_oslTemplate.ass".
-                std::string testRenderer("\"" + std::string(MATERIALX_ARNOLD_EXECUTABLE) + "\"");
-                
+                std::string testRenderer(MATERIALX_ARNOLD_EXECUTABLE);
+                if (testRenderer.empty()) 
+                    testRenderer = "kick";
+
                 if (!testRenderer.empty())
                 {
-                    //-r 512 512 - as 1 - i brick_nodedef_image_test.ass  of png -dw - o brick_nodedef_image_test.png
-                    const std::string renderOSL = shaderPath + ".png";
+                    const std::string renderOSL = shaderPath.asString() + ".png";
                     const std::string inputArgs = " -ib -as 1 -i " + oslTemplateFile.asString();
                     const std::string outputArgs = " -r 512 512 -of png -dw -o " + renderOSL;
                     std::string setParameters;
-                    setParameters += " -set osl.shadername \"" + shaderPath + "\"";
+                    setParameters += " -set osl.shadername ./" + arnoldShaderName;
                     setParameters += " -set /Map__env_image.filename \"" + envMapFile.asString() + "\"";
                     setParameters += " -set options.texture_searchpath \"" + imageSearchPath.asString() + "\"";
 
-                    std::string errorFile(shaderPath + "_compile_errors.txt");
+                    std::string errorFile(shaderPath.asString() + "_compile_errors.txt");
                     const std::string redirectString(" 2>&1");
 
-                    std::string command =
-                        testRenderer + inputArgs + setParameters + outputArgs
+                    std::string command =  testRenderer + inputArgs + setParameters + outputArgs
                         + " > " + errorFile + redirectString;
                     log << command << std::endl;
                     std::cout << command << std::endl;
+
+                    // Switch to path where shader is before running and then switch back.
+                    outputFilePath.setCurrentPath();
                     int returnValue = std::system(command.c_str());
+                    currentPath.setCurrentPath();
 
                     std::ifstream errorStream(errorFile);
                     std::string result;
