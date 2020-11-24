@@ -32,13 +32,22 @@ void ShaderTranslator::connectTranslationInputs(NodePtr shader, NodeDefPtr trans
             {
                 InputPtr input = _translationNode->addInput(shaderInput->getName(), shaderInput->getType());
                 input->setConnectedNode(_graph->getNode(output->getNodeName()));
-
+                if (shaderInput->getColorSpace() != EMPTY_STRING) {
+                  input->setColorSpace(shaderInput->getColorSpace());
+                }
                 _graph->removeOutput(output->getName());
             }
             else if (shaderInput->getValueString() != EMPTY_STRING)
             { 
                 InputPtr input = _translationNode->addInput(shaderInput->getName(), shaderInput->getType());
                 input->setValueString(shaderInput->getValueString());
+                if (shaderInput->getColorSpace() != EMPTY_STRING) {
+                    input->setColorSpace(shaderInput->getColorSpace());
+                }
+                if (shaderInput->getUnit() != EMPTY_STRING) {
+                    input->setUnit(shaderInput->getUnit());
+                    input->setUnitType(shaderInput->getUnitType());
+                }
             }
             else
             {
@@ -102,8 +111,17 @@ void ShaderTranslator::connectTranslationOutputs(NodePtr shader)
         }
         else
         {
-            translatedNode = _graph->addNode("dot", inputName + "_dot", translationGraphOutput->getType());
-            InputPtr dotNodeInput = translatedNode->addInput("in", translationGraphOutput->getType());
+            const string DOT_NAME = inputName + "_dot";
+            translatedNode = _graph->getNode(DOT_NAME);
+            if (!translatedNode)
+            {
+                translatedNode = _graph->addNode("dot", DOT_NAME, translationGraphOutput->getType());
+            }
+            InputPtr dotNodeInput = translatedNode->getInput("in");
+            if (!dotNodeInput)
+            {
+                dotNodeInput = translatedNode->addInput("in", translationGraphOutput->getType());
+            }
             if (translationGraphOutput->getNodeName() == EMPTY_STRING)
             {
                 dotNodeInput->setValueString(translationGraphOutput->getValueString());
@@ -113,14 +131,31 @@ void ShaderTranslator::connectTranslationOutputs(NodePtr shader)
                 dotNodeInput->setConnectedNode(_translationNode);
                 dotNodeInput->setOutputString(outputName);
             }
+            if (!translationGraphOutput->getColorSpace().empty()) 
+            {
+                dotNodeInput->setColorSpace(translationGraphOutput->getColorSpace());
+            }
+            if (!translationGraphOutput->getUnit().empty())
+            {
+                dotNodeInput->setUnit(translationGraphOutput->getUnit());
+                dotNodeInput->setUnitType(translationGraphOutput->getUnitType());
+            }
         }
 
         // Create translated output.
-        OutputPtr translatedOutput = _graph->addOutput(outputName, translationGraphOutput->getType());
+        OutputPtr translatedOutput = _graph->getOutput(outputName);
+        if (!translatedOutput)
+        {
+            translatedOutput = _graph->addOutput(outputName, translationGraphOutput->getType());
+        }
         translatedOutput->setConnectedNode(translatedNode);
 
         // Add translated shaderInput.
-        InputPtr translatedshaderInput = shader->addInput(inputName, translationGraphOutput->getType());
+        InputPtr translatedshaderInput = shader->getInput(inputName);
+        if (!translatedshaderInput)
+        {
+            translatedshaderInput = shader->addInput(inputName, translationGraphOutput->getType());
+        }
         translatedshaderInput->setConnectedOutput(translatedOutput);
     }
 }
@@ -132,17 +167,17 @@ void ShaderTranslator::translateShader(NodePtr shader, const string& destCategor
         return;
     }
 
-    string sourceCategory = shader->getCategory();
+    const string& sourceCategory = shader->getCategory();
     if (sourceCategory == destCategory)
     {
-        throw Exception("The source shader category is already \"" + destCategory + "\"");
+        throw Exception("The source shader \"" + shader->getNamePath() + "\" category is already \"" + destCategory + "\"");
     }
 
     DocumentPtr doc = shader->getDocument();
-    vector<OutputPtr> referencedOutputs = shader->getOutputs();
+    vector<OutputPtr> referencedOutputs = getConnectedOutputs(shader);
     if (!referencedOutputs.empty())
     {
-        _graph = referencedOutputs[0]->getParent()->asA<NodeGraph>();
+        _graph = referencedOutputs[0]->getParent() ? referencedOutputs[0]->getParent()->asA<NodeGraph>() : nullptr;
     }
     if (!_graph)
     {
@@ -162,6 +197,9 @@ void ShaderTranslator::translateShader(NodePtr shader, const string& destCategor
     shader->setCategory(destCategory);
     shader->removeAttribute(InterfaceElement::NODE_DEF_ATTRIBUTE);
     connectTranslationOutputs(shader);
+
+    _graph = nullptr;
+    _translationNode = nullptr;
 }
 
 void ShaderTranslator::translateAllMaterials(DocumentPtr doc, string destCategory)
