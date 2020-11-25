@@ -30,69 +30,22 @@ set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 set(CMAKE_MACOSX_RPATH ON)
 enable_testing()
 
+option(MATERIALX_BUILD_PYTHON "Build the MaterialX Python package from C++ bindings. Requires Python 2.7 or greater." OFF)
+option(MATERIALX_BUILD_VIEWER "Build the MaterialX Viewer." ON)
 option(MATERIALX_BUILD_DOCS "Create HTML documentation using Doxygen. Requires that Doxygen be installed." OFF)
-option(MATERIALX_WARNINGS_AS_ERRORS "Interpret all compiler warnings as errors." OFF)
 
-# Shading language generation options
 option(MATERIALX_BUILD_GEN_GLSL "Build the GLSL shader generator back-end." ON)
 option(MATERIALX_BUILD_GEN_OSL "Build the OSL shader generator back-end." ON)
 option(MATERIALX_BUILD_GEN_MDL "Build the MDL shader generator back-end." ON)
-option(MATERIALX_BUILD_GEN_OGSXML "Build the OGSXML shader generator back-end." ON)
-option(MATERIALX_BUILD_GEN_OGSFX "Build the OGSFX shader generator back-end." ON)
-option(MATERIALX_BUILD_GEN_ARNOLD "Build the Arnold OSL shader generator back-end." ON)
-
-option(MATERIALX_BUILD_PYTHON "Build the MaterialX Python package from C++ bindings. Requires Python 2.7 or greater." OFF)
-option(MATERIALX_BUILD_RUNTIME "Build the MaterialX Runtime data model library." OFF)
 option(MATERIALX_BUILD_RENDER "Build the MaterialX Render modules." ON)
-option(MATERIALX_BUILD_CROSS "Build MaterialXCross folder." OFF)
-
-if(MATERIALX_DISABLE_BUILD_RENDER)
-    message(WARNING "MATERIALX_DISABLE_BUILD_RENDER is deprecated. Please use MATERIALX_BUILD_RENDER instead")
-    set(MATERIALX_BUILD_RENDER OFF)
-endif()
+option(MATERIALX_BUILD_OIIO "Build OpenImageIO support for MaterialXRender." OFF)
+option(MATERIALX_BUILD_TESTS "Build unit tests." ON)
 
 option(MATERIALX_BUILD_SHARED_LIBS "Build MaterialX libraries as shared rather than static." OFF)
 option(MATERIALX_PYTHON_LTO "Enable link-time optimizations for MaterialX Python." ON)
 option(MATERIALX_INSTALL_PYTHON "Install the MaterialX Python package as a third-party library when the install target is built." ON)
-
 option(MATERIALX_TEST_RENDER "Run rendering tests for MaterialX Render module. GPU required for graphics validation." ON)
-option(MATERIALX_BUILD_OIIO "Build OpenImageIO support for MaterialXRender." OFF)
-option(MATERIALX_BUILD_VIEWER "Build the MaterialX Viewer." ON)
-option(MATERIALX_BUILD_CONTRIB "Build contribution folder." ON)
-option(MATERIALX_BUILD_TESTS "Build unit tests." ON)
-
-if (NOT MATERIALX_BUILD_PYTHON)
-    set(MATERIALX_PYTHON_LTO OFF)
-    set(MATERIALX_INSTALL_PYTHON OFF)
-endif()
-
-if (MATERIALX_BUILD_RENDER)
-    set(MATERIALX_BUILD_OSL ON)
-    set(MATERIALX_BUILD_GLSL ON)
-else()
-    set(MATERIALX_TEST_RENDER OFF)
-    set(MATERIALX_BUILD_VIEWER OFF)
-    set(MATERIALX_BUILD_CONTRIB OFF)
-    set(MATERIALX_BUILD_OIIO OFF)
-endif()
-
-if (MATERIALX_BUILD_GEN_ARNOLD)
-    set(MATERIALX_BUILD_GEN_OSL ON)
-endif()
-
-if (MATERIALX_BUILD_GEN_OGSFX)
-    set(MATERIALX_BUILD_GEN_GLSL ON)
-endif()
-
-if (MATERIALX_BUILD_GEN_OGSXML)
-    set(MATERIALX_BUILD_GEN_GLSL ON)
-endif()
-
-if (MATERIALX_BUILD_GEN_GLSL OR MATERIALX_BUILD_GEN_OSL OR MATERIALX_BUILD_GEN_OGSXML OR MATERIALX_BUILD_GEN_OGSFX OR MATERIALX_BUILD_GEN_ARNOLD)
-    set(MATERIALX_BUILD_GEN ON)
-else()
-    set(MATERIALX_BUILD_GEN OFF)
-endif()
+option(MATERIALX_WARNINGS_AS_ERRORS "Interpret all compiler warnings as errors." OFF)
 
 set(MATERIALX_PYTHON_VERSION "" CACHE STRING
     "Python version to be used in building the MaterialX Python package (e.g. '2.7').")
@@ -128,19 +81,17 @@ set(MATERIALX_INSTALL_LIB_PATH "lib" CACHE STRING "Install lib path (e.g. 'libs'
 set(MATERIALX_INSTALL_STDLIB_PATH "libraries" CACHE STRING "Install path for mtlx std libs (e.g. 'libraries').")
 
 mark_as_advanced(MATERIALX_BUILD_DOCS)
-mark_as_advanced(MATERIALX_WARNINGS_AS_ERRORS)
-mark_as_advanced(MATERIALX_BUILD_GEN_OGSXML)
-mark_as_advanced(MATERIALX_BUILD_GEN_OGSFX)
-mark_as_advanced(MATERIALX_BUILD_GEN_ARNOLD)
-mark_as_advanced(MATERIALX_BUILD_GEN)
+mark_as_advanced(MATERIALX_BUILD_GEN_GLSL)
+mark_as_advanced(MATERIALX_BUILD_GEN_OSL)
+mark_as_advanced(MATERIALX_BUILD_GEN_MDL)
 mark_as_advanced(MATERIALX_BUILD_RENDER)
-mark_as_advanced(MATERIALX_BUILD_CROSS)
+mark_as_advanced(MATERIALX_BUILD_OIIO)
+mark_as_advanced(MATERIALX_BUILD_TESTS)
+mark_as_advanced(MATERIALX_BUILD_SHARED_LIBS)
 mark_as_advanced(MATERIALX_PYTHON_LTO)
 mark_as_advanced(MATERIALX_INSTALL_PYTHON)
 mark_as_advanced(MATERIALX_TEST_RENDER)
-mark_as_advanced(MATERIALX_BUILD_CONTRIB)
-mark_as_advanced(MATERIALX_BUILD_OIIO)
-mark_as_advanced(MATERIALX_DEBUG_POSTFIX)
+mark_as_advanced(MATERIALX_WARNINGS_AS_ERRORS)
 mark_as_advanced(MATERIALX_PYTHON_VERSION)
 mark_as_advanced(MATERIALX_PYTHON_EXECUTABLE)
 mark_as_advanced(MATERIALX_PYTHON_OCIO_DIR)
@@ -153,6 +104,56 @@ mark_as_advanced(MATERIALX_ARNOLD_EXECUTABLE)
 mark_as_advanced(MATERIALX_INSTALL_INCLUDE_PATH)
 mark_as_advanced(MATERIALX_INSTALL_LIB_PATH)
 mark_as_advanced(MATERIALX_INSTALL_STDLIB_PATH)
+
+### ADSK only modules ###
+option(MATERIALX_BUILD_CONTRIB "Build contribution folder." ON)
+option(MATERIALX_BUILD_CROSS "Build MaterialXCross folder." OFF)
+option(MATERIALX_BUILD_GEN_OGSXML "Build the OGSXML shader generator back-end." ON)
+option(MATERIALX_BUILD_GEN_OGSFX "Build the OGSFX shader generator back-end." ON)
+option(MATERIALX_BUILD_GEN_ARNOLD "Build the Arnold OSL shader generator back-end." ON)
+option(MATERIALX_BUILD_RUNTIME "Build the MaterialX Runtime data model library." OFF)
+
+if (NOT MATERIALX_BUILD_PYTHON)
+    set(MATERIALX_PYTHON_LTO OFF)
+    set(MATERIALX_INSTALL_PYTHON OFF)
+endif()
+
+if (MATERIALX_BUILD_RENDER)
+    set(MATERIALX_BUILD_OSL ON)
+    set(MATERIALX_BUILD_GLSL ON)
+else()
+    set(MATERIALX_TEST_RENDER OFF)
+    set(MATERIALX_BUILD_VIEWER OFF)
+    set(MATERIALX_BUILD_CONTRIB OFF)
+    set(MATERIALX_BUILD_OIIO OFF)
+endif()
+
+if (MATERIALX_BUILD_GEN_ARNOLD)
+    set(MATERIALX_BUILD_GEN_OSL ON)
+endif()
+
+if (MATERIALX_BUILD_GEN_OGSFX)
+    set(MATERIALX_BUILD_GEN_GLSL ON)
+endif()
+
+if (MATERIALX_BUILD_GEN_OGSXML)
+    set(MATERIALX_BUILD_GEN_GLSL ON)
+endif()
+
+if (MATERIALX_BUILD_GEN_GLSL OR MATERIALX_BUILD_GEN_OSL OR MATERIALX_BUILD_GEN_OGSXML OR MATERIALX_BUILD_GEN_OGSFX OR MATERIALX_BUILD_GEN_ARNOLD)
+    set(MATERIALX_BUILD_GEN ON)
+else()
+    set(MATERIALX_BUILD_GEN OFF)
+endif()
+
+mark_as_advanced(MATERIALX_BUILD_GEN_OGSXML)
+mark_as_advanced(MATERIALX_BUILD_GEN_OGSFX)
+mark_as_advanced(MATERIALX_BUILD_GEN_ARNOLD)
+mark_as_advanced(MATERIALX_BUILD_CROSS)
+mark_as_advanced(MATERIALX_BUILD_GEN)
+mark_as_advanced(MATERIALX_BUILD_CONTRIB)
+mark_as_advanced(MATERIALX_DEBUG_POSTFIX)
+
 if (MATERIALX_BUILD_GEN_MDL)
     mark_as_advanced(MATERIALX_MDLC_EXECUTABLE)
     mark_as_advanced(MATERIALX_MDL_RENDER_EXECUTABLE)
@@ -312,57 +313,51 @@ if (MATERIALX_BUILD_RENDER)
     endif()
 endif()
 
-# Add runtime subdirectory
-if(MATERIALX_BUILD_RUNTIME)
-    add_definitions(-DMATERIALX_BUILD_RUNTIME)
-    add_subdirectory(source/MaterialXRuntime)
+# Add test subdirectory
+if(MATERIALX_BUILD_TESTS)
+    add_subdirectory(source/MaterialXTest)
 endif()
 
+# Add Python subdirectories
 if(MATERIALX_BUILD_PYTHON)
     add_subdirectory(source/PyMaterialX)
     add_subdirectory(python)
-endif()
-
-if(MATERIALX_BUILD_JS)
-    add_subdirectory(source/JsMaterialX)
 endif()
 
 if(MATERIALX_BUILD_DOCS)
     add_subdirectory(documents)
 endif()
 
-if(MATERIALX_BUILD_TESTS)
-    add_subdirectory(source/MaterialXTest)
+# Add runtime subdirectory
+if(MATERIALX_BUILD_RUNTIME)
+    add_definitions(-DMATERIALX_BUILD_RUNTIME)
+    add_subdirectory(source/MaterialXRuntime)
+endif()
+
+if(MATERIALX_BUILD_JS)
+    add_subdirectory(source/JsMaterialX)
 endif()
 
 if(${CMAKE_VERSION} VERSION_GREATER "3.6.2")
     if(MATERIALX_BUILD_VIEWER)
         set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT MaterialXView)
     else()
-        if (NOT MATERIALX_DISABLE_BUILD_RENDER)
-            set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT MaterialXTest)
-        endif()
+        set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT MaterialXTest)
     endif()
 endif()
 
 include(CMakePackageConfigHelpers)
-write_basic_package_version_file(
-    ${CMAKE_BINARY_DIR}/cmake/MaterialXConfigVersion.cmake
-    VERSION ${CMAKE_VERSION}
-    COMPATIBILITY AnyNewerVersion
-)
+write_basic_package_version_file(${CMAKE_BINARY_DIR}/cmake/MaterialXConfigVersion.cmake
+                                 VERSION ${CMAKE_VERSION}
+                                 COMPATIBILITY AnyNewerVersion)
 
 # Package for using the developer build
-export(
-    EXPORT MaterialX
-    FILE ${CMAKE_BINARY_DIR}/cmake/MaterialXConfig.cmake
-    )
+export(EXPORT MaterialX
+       FILE ${CMAKE_BINARY_DIR}/cmake/MaterialXConfig.cmake)
 
 # Package for using the installed build
-install(
-    EXPORT      MaterialX
-    DESTINATION cmake
-    FILE        MaterialXConfig.cmake)
-install(
-    FILES "${CMAKE_BINARY_DIR}/cmake/MaterialXConfigVersion.cmake"
-    DESTINATION cmake)
+install(EXPORT MaterialX
+        DESTINATION cmake
+        FILE MaterialXConfig.cmake)
+install(FILES "${CMAKE_BINARY_DIR}/cmake/MaterialXConfigVersion.cmake"
+        DESTINATION cmake)
