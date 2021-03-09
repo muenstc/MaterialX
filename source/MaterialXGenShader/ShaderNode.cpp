@@ -115,6 +115,7 @@ const string ShaderNode::CONSTANT = "constant";
 const string ShaderNode::IMAGE = "image";
 const string ShaderNode::COMPARE = "compare";
 const string ShaderNode::SWITCH = "switch";
+const string ShaderNode::SCATTER_MODE = "scatter_mode";
 const string ShaderNode::BSDF_R = "R";
 const string ShaderNode::BSDF_T = "T";
 const string ShaderNode::TEXTURE2D_GROUPNAME = "texture2d";
@@ -205,7 +206,7 @@ ShaderNodePtr ShaderNode::create(const ShaderGraph* parent, const string& name, 
     const ShaderGenerator& shadergen = context.getShaderGenerator();
 
     // Find the implementation for this nodedef
-    InterfaceElementPtr impl = nodeDef.getImplementation(shadergen.getTarget(), shadergen.getLanguage());
+    InterfaceElementPtr impl = nodeDef.getImplementation(shadergen.getTarget());
     if (impl)
     {
         newNode->_impl = shadergen.getImplementation(*impl, context);
@@ -213,7 +214,7 @@ ShaderNodePtr ShaderNode::create(const ShaderGraph* parent, const string& name, 
     if (!newNode->_impl)
     {
         throw ExceptionShaderGenError("Could not find a matching implementation for node '" + nodeDef.getNodeString() +
-            "' matching language '" + shadergen.getLanguage() + "' and target '" + shadergen.getTarget() + "'");
+            "' matching target '" + shadergen.getTarget() + "'");
     }
 
     // Check for classification based on group name
@@ -311,7 +312,7 @@ ShaderNodePtr ShaderNode::create(const ShaderGraph* parent, const string& name, 
             newNode->_classification |= Classification::LAYER;
         }
         // Check specifically for the thin-film node
-        else if (nodeDef.getName() == "ND_thin_film_brdf")
+        else if (nodeDef.getName() == "ND_thin_film_bsdf")
         {
             newNode->_classification |= Classification::THINFILM;
         }
@@ -408,7 +409,7 @@ void ShaderNode::initialize(const Node& node, const NodeDef& nodeDef, GenContext
 
     // Set element paths based on the node definition. Note that these
     // paths don't actually exist at time of shader generation since there
-    // are no inputs/parameters specified on the node itself
+    // are no inputs specified on the node itself
     //
     const string& nodePath = node.getNamePath();
     for (auto nodeInput : nodeDef.getActiveInputs())
@@ -419,12 +420,20 @@ void ShaderNode::initialize(const Node& node, const NodeDef& nodeDef, GenContext
             input->setPath(nodePath + NAME_PATH_SEPARATOR + nodeInput->getName());
         }
     }
-    for (auto nodeParameter : nodeDef.getActiveParameters())
+
+    // For BSDF nodes see if there is a scatter_mode input,
+    // and update the classification accordingly.
+    if (hasClassification(Classification::BSDF))
     {
-        ShaderInput* input = getInput(nodeParameter->getName());
-        if (input && input->getPath().empty())
+        const InputPtr scatterModeInput = node.getInput(SCATTER_MODE);
+        const string& scatterMode = scatterModeInput ? scatterModeInput->getValueString() : EMPTY_STRING;
+        // If scatter mode is only T, set classification to only transmission.
+        // Note: For only R we must still keep classification at default value (both reflection/transmission)
+        // since reflection needs to attenuate the transmission amount in HW shaders when layering is used.
+        if (scatterMode == BSDF_T)
         {
-            input->setPath(nodePath + NAME_PATH_SEPARATOR + nodeParameter->getName());
+            _classification |= Classification::BSDF_T;
+            _classification &= ~Classification::BSDF_R;
         }
     }
 }

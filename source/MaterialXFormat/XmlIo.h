@@ -38,13 +38,13 @@ class XmlReadOptions
     /// needs to be read into a document.  Defaults to readFromXmlFile.
     XmlReadFunction readXIncludeFunction;
 
+    /// If true, then XML comments will be read into documents as comment elements.
+    /// Defaults to false.
+    bool readComments;
+
     /// The vector of parent XIncludes at the scope of the current document.
     /// Defaults to an empty vector.
     StringVec parentXIncludes;
-
-    /// Apply updates that test prototype functionality for future versions
-    /// of MaterialX.  Defaults to false.
-    bool applyFutureUpdates;
 };
 
 /// @class XmlWriteOptions
@@ -115,8 +115,8 @@ void readFromXmlStream(DocumentPtr doc, std::istream& stream, const XmlReadOptio
 /// @throws ExceptionParseError if the document cannot be parsed.
 /// @throws ExceptionFileMissing if the file cannot be opened.
 void readFromXmlFile(DocumentPtr doc,
-                     const FilePath& filename,
-                     const FileSearchPath& searchPath = FileSearchPath(),
+                     FilePath filename,
+                     FileSearchPath searchPath = FileSearchPath(),
                      const XmlReadOptions* readOptions = nullptr);
 
 /// Read a Document as XML from the given string.

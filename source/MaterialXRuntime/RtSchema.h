@@ -99,18 +99,39 @@ public:
     }
 
     /// Return metadata from the prim.
-    /// Shorthand for calling getPrim().getMetadata().
+    /// Shorthand for calling getPrim().getMetadata(name).
     RtTypedValue* getMetadata(const RtToken& name)
     {
         return getPrim().getMetadata(name);
     }
 
     /// Return metadata from the prim.
-    /// Shorthand for calling getPrim().getMetadata().
+    /// Shorthand for calling getPrim().getMetadata(name).
     const RtTypedValue* getMetadata(const RtToken& name) const
     {
         return getPrim().getMetadata(name);
     }
+
+    /// Return metadata from the prim, including a type check.
+    /// Shorthand for calling getPrim().getMetadata(name, type).
+    RtTypedValue* getMetadata(const RtToken& name, const RtToken& type)
+    {
+        return getPrim().getMetadata(name, type);
+    }
+
+    /// Return metadata from the prim, including a type check.
+    /// Shorthand for calling getPrim().getMetadata(name, type).
+    const RtTypedValue* getMetadata(const RtToken& name, const RtToken& type) const
+    {
+        return getPrim().getMetadata(name, type);
+    }
+
+    /// Returns a vector of public metadata names for the schema.
+    virtual const RtTokenVec& getPublicMetadataNames() const;
+
+    /// Returns a vector of public port metatdata names for the schema.
+    virtual const RtTokenVec& getPublicPortMetadataNames(const RtToken& name) const;
+
 
     // Accessors.
     PvtPrim* prim() const;

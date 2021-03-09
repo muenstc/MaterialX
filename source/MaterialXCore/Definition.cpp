@@ -27,7 +27,6 @@ const string TypeDef::SEMANTIC_ATTRIBUTE = "semantic";
 const string TypeDef::CONTEXT_ATTRIBUTE = "context";
 const string Implementation::FILE_ATTRIBUTE = "file";
 const string Implementation::FUNCTION_ATTRIBUTE = "function";
-const string Implementation::LANGUAGE_ATTRIBUTE = "language";
 const string UnitDef::UNITTYPE_ATTRIBUTE = "unittype";
 const string AttributeDef::ATTRNAME_ATTRIBUTE = "attrname";
 const string AttributeDef::VALUE_ATTRIBUTE = "value";
@@ -57,61 +56,35 @@ const string& NodeDef::getType() const
     }
 }
 
-InterfaceElementPtr NodeDef::getImplementation(const string& target, const string& language) const
+InterfaceElementPtr NodeDef::getImplementation(const string& target) const
 {
     vector<InterfaceElementPtr> interfaces = getDocument()->getMatchingImplementations(getQualifiedName(getName()));
     vector<InterfaceElementPtr> secondary = getDocument()->getMatchingImplementations(getName());
     interfaces.insert(interfaces.end(), secondary.begin(), secondary.end());
 
-    // Search for the first implementation which matches a given language string.
-    // If no language is specified then return the first implementation found.
-    bool matchLanguage = !language.empty();
-    for (InterfaceElementPtr interface : interfaces)
+    if (target.empty())
     {
-        ImplementationPtr implement = interface->asA<Implementation>();
-        if (!implement||
-            !targetStringsMatch(interface->getTarget(), target) ||
-            !isVersionCompatible(interface))
-        {
-            continue;
-        }
-        if (!matchLanguage ||
-            implement->getLanguage() == language)
-        {
-            return interface;
-        }
+        return !interfaces.empty() ? interfaces[0] : InterfaceElementPtr();
     }
 
-    // Search for a node graph match if no implementation match was found.
-    // There is no language check as node graphs are considered to be language independent.
-    for (InterfaceElementPtr interface : interfaces)
-    {
-        if (interface->isA<Implementation>() ||
-            !targetStringsMatch(interface->getTarget(), target) ||
-            !isVersionCompatible(interface))
-        {
-            continue;
-        }
-        return interface;
-    }
+    // Get all candidate targets matching the given target,
+    // taking inheritance into account.
+    const TargetDefPtr targetDef = getDocument()->getTargetDef(target);
+    const StringVec candidateTargets = targetDef ? targetDef->getMatchingTargets() : StringVec();
 
-    return InterfaceElementPtr();
-}
-
-vector<ShaderRefPtr> NodeDef::getInstantiatingShaderRefs() const
-{
-    vector<ShaderRefPtr> shaderRefs;
-    for (MaterialPtr mat : getDocument()->getMaterials())
+    // Search the candidate targets in order
+    for (const string& candidateTarget : candidateTargets)
     {
-        for (ShaderRefPtr shaderRef : mat->getShaderRefs())
+        for (InterfaceElementPtr interface : interfaces)
         {
-            if (shaderRef->getNodeDef()->hasInheritedBase(getSelf()))
+            if (targetStringsMatch(interface->getTarget(), candidateTarget))
             {
-                shaderRefs.push_back(shaderRef);
+                return interface;
             }
         }
     }
-    return shaderRefs;
+
+    return InterfaceElementPtr();
 }
 
 bool NodeDef::validate(string* message) const
@@ -121,13 +94,13 @@ bool NodeDef::validate(string* message) const
     return InterfaceElement::validate(message) && res;
 }
 
-bool NodeDef::isVersionCompatible(ConstElementPtr elem) const
+bool NodeDef::isVersionCompatible(const string& version) const
 {
-    if (getVersionIntegers() == elem->getVersionIntegers())
+    if (getVersionString() == version)
     {
         return true;
     }
-    if (getDefaultVersion() && !elem->hasVersionString())
+    if (getDefaultVersion() && version.empty())
     {
         return true;
     }
@@ -160,9 +133,28 @@ NodeDefPtr Implementation::getNodeDef() const
     return resolveRootNameReference<NodeDef>(getNodeDefString());
 }
 
+bool Implementation::validate(string* message) const
+{
+    bool res = true;
+    validateRequire(!hasVersionString(), res, message, "Implementation elements do not support version strings");
+    return InterfaceElement::validate(message) && res;
+}
+
 ConstNodeDefPtr Implementation::getDeclaration(const string&) const
 {
     return getNodeDef();
+}
+
+StringVec TargetDef::getMatchingTargets() const
+{
+    StringVec result = { getName() };
+    ElementPtr base = getInheritsFrom();
+    while (base)
+    {
+        result.push_back(base->getName());
+        base = base->getInheritsFrom();
+    }
+    return result;
 }
 
 vector<UnitDefPtr> UnitTypeDef::getUnitDefs() const

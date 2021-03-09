@@ -10,6 +10,7 @@
 #include <maya/MPxShadingNodeOverride.h>
 #include <maya/MPxSurfaceShadingNodeOverride.h>
 
+#include <MaterialXFormat/Util.h>
 #include <MaterialXGenShader/Util.h>
 #include <MaterialXGenShader/HwShaderGenerator.h>
 #include <MaterialXGenOgsXml/OgsFragment.h>
@@ -226,7 +227,10 @@ ShadingNodeOverride<BASE>::fragmentName() const
     MFnDependencyNode depNode(_object, &status);
     const auto* const node = dynamic_cast<MaterialXNode*>(depNode.userNode());
     const OgsFragment* const data = node ? node->getOgsFragment() : nullptr;
-    return data ? data->getFragmentName().c_str() : "";
+    if (data) {
+        return data->getLightRigName().empty() ? data->getFragmentName().c_str() : data->getLightRigName().c_str();
+    }
+    return "";
 }
 
 template <class BASE>
@@ -278,6 +282,7 @@ void ShadingNodeOverride<BASE>::updateShader(MHWRender::MShaderInstance& shaderI
     bindEnvironmentLighting(shaderInstance, parameterList, lightSearchPath, *node);
 
     mx::DocumentPtr document = ogsFragment->getDocument();
+    mx::flattenFilenames(document, imageSearchPath);
 
     // Look for any udimset on the document to use for texture binding.
     mx::ValuePtr udimSetValue = document->getGeomPropValue("udimset");
@@ -306,10 +311,25 @@ void ShadingNodeOverride<BASE>::updateShader(MHWRender::MShaderInstance& shaderI
     const mx::StringMap& inputs = ogsFragment->getPathInputMap();
     for (const auto& input : inputs)
     {
-        mx::ElementPtr element = document->getDescendant(input.first);
+        const std::string& elementPath = input.first;
+        mx::ElementPtr element = document->getDescendant(elementPath);
         if (!element)
         {
-            continue;
+            std::string nodePath = mx::parentNamePath(elementPath);
+            mx::ElementPtr uniformParent = document->getDescendant(nodePath);
+            if (uniformParent)
+            {
+                mx::NodePtr uniformNode = uniformParent->asA<mx::Node>();
+                if (uniformNode)
+                {
+                    mx::StringVec pathVec = mx::splitNamePath(elementPath);
+                    element = uniformNode->addInputFromNodeDef(pathVec[pathVec.size() - 1]);
+                }
+            }
+            if (!element)
+            {
+                continue;
+            }        
         }
 
         mx::ValueElementPtr valueElement = element->asA<mx::ValueElement>();

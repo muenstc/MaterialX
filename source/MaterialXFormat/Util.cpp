@@ -43,7 +43,7 @@ void getSubdirectories(const FilePathVec& rootDirectories, const FileSearchPath&
 
 void loadDocuments(const FilePath& rootPath, const FileSearchPath& searchPath, const StringSet& skipFiles,
                    const StringSet& includeFiles, vector<DocumentPtr>& documents, StringVec& documentsPaths,
-                   const XmlReadOptions& readOptions, StringVec& errors)
+                   const XmlReadOptions* readOptions, StringVec* errors)
 {
     for (const FilePath& dir : rootPath.getSubDirectories())
     {
@@ -58,20 +58,23 @@ void loadDocuments(const FilePath& rootPath, const FileSearchPath& searchPath, c
                 {
                     FileSearchPath readSearchPath(searchPath);
                     readSearchPath.append(dir);
-                    readFromXmlFile(doc, filePath, readSearchPath, &readOptions);
+                    readFromXmlFile(doc, filePath, readSearchPath, readOptions);
                     documents.push_back(doc);
                     documentsPaths.push_back(filePath.asString());
                 }
                 catch (Exception& e)
                 {
-                    errors.push_back("Failed to load: " + filePath.asString() + ". Error: " + e.what());
+                    if (errors)
+                    {
+                        errors->push_back("Failed to load: " + filePath.asString() + ". Error: " + e.what());
+                    }
                 }
             }
         }
     }
 }
 
-void loadLibrary(const FilePath& file, DocumentPtr doc, const FileSearchPath& searchPath, XmlReadOptions* readOptions)
+void loadLibrary(const FilePath& file, DocumentPtr doc, const FileSearchPath& searchPath, const XmlReadOptions* readOptions)
 {
     DocumentPtr libDoc = createDocument();
     readFromXmlFile(libDoc, file, searchPath, readOptions);
@@ -82,7 +85,7 @@ StringSet loadLibraries(const FilePathVec& libraryFolders,
                         const FileSearchPath& searchPath,
                         DocumentPtr doc,
                         const StringSet& excludeFiles,
-                        XmlReadOptions* readOptions)
+                        const XmlReadOptions* readOptions)
 {
     // Append environment path to the specified search path.
     FileSearchPath librarySearchPath = searchPath;
@@ -137,7 +140,7 @@ StringSet loadLibraries(const FilePathVec& libraryFolders,
     return loadedLibraries;
 }
 
-void resolveFileNames(DocumentPtr doc, const FileSearchPath& searchPath, StringResolverPtr customResolver)
+void flattenFilenames(DocumentPtr doc, const FileSearchPath& searchPath, StringResolverPtr customResolver)
 {
     for (ElementPtr elem : doc->traverseTree())
     {
@@ -148,6 +151,10 @@ void resolveFileNames(DocumentPtr doc, const FileSearchPath& searchPath, StringR
         }
 
         FilePath unresolvedValue(valueElem->getValueString());
+        if (unresolvedValue.isEmpty())
+        {
+            continue;
+        }
         StringResolverPtr elementResolver = elem->createStringResolver();
         // If the path is already absolute then don't allow an additional prefix
         // as this would make the path invalid.
@@ -157,7 +164,7 @@ void resolveFileNames(DocumentPtr doc, const FileSearchPath& searchPath, StringR
         }
         string resolvedString = valueElem->getResolvedValueString(elementResolver);
 
-        // Convert relative to absolute pathing if the file is not alrady found
+        // Convert relative to absolute pathing if the file is not already found
         if (!searchPath.isEmpty())
         {
             FilePath resolvedValue(resolvedString);
@@ -193,6 +200,5 @@ void resolveFileNames(DocumentPtr doc, const FileSearchPath& searchPath, StringR
         }
     }
 }
-
 
 } // namespace MaterialX

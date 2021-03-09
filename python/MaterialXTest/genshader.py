@@ -1,17 +1,19 @@
-import os
-import unittest
+#!/usr/bin/env python
+'''
+Unit tests for shader generation in MaterialX Python.
+'''
+
+import os, unittest
 
 import MaterialX as mx
 import MaterialX.PyMaterialXGenShader as mx_gen_shader
 import MaterialX.PyMaterialXGenOsl as mx_gen_osl
 
-# Unit tests for GenShader (Python).
 class TestGenShader(unittest.TestCase):
-
     def test_ShaderInterface(self):
         doc = mx.createDocument()
 
-        libraryFolders = ["stdlib"]
+        libraryFolders = ["targets", "stdlib"]
         filePath = os.path.dirname(os.path.abspath(__file__))
         searchPath = os.path.join(filePath, "..", "..", "libraries")
         mx.loadLibraries(libraryFolders, searchPath, doc)

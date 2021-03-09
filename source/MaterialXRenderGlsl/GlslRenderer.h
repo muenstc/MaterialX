@@ -17,7 +17,7 @@
 namespace MaterialX
 {
 
-using GLUtilityContextPtr = std::shared_ptr<class GLUtilityContext>;
+using GLContextPtr = std::shared_ptr<class GLContext>;
 using SimpleWindowPtr = std::shared_ptr<class SimpleWindow>;
 
 /// Shared pointer to a GlslRenderer
@@ -41,10 +41,10 @@ class GlslRenderer : public ShaderRenderer
 {
   public:
     /// Create a GLSL renderer instance
-    static GlslRendererPtr create(unsigned int width = 512, unsigned int height = 512, Image::BaseType baseType = Image::BaseType::UINT8, const Color4& clearColor = Color4(0.4f, 0.4f, 0.4f, 1.0f));
+    static GlslRendererPtr create(unsigned int width = 512, unsigned int height = 512, Image::BaseType baseType = Image::BaseType::UINT8);
 
     /// Destructor
-    virtual ~GlslRenderer();
+    virtual ~GlslRenderer() { };
 
     /// @name Setup
     /// @{
@@ -87,8 +87,10 @@ class GlslRenderer : public ShaderRenderer
     ImagePtr captureImage() override;
 
     /// Save the current contents of the off-screen hardware buffer to disk.
-    /// @param filePath Name of file to save rendered image to.
     void saveImage(const FilePath& filePath, ConstImagePtr image, bool verticalFlip) override;
+
+    /// Load images referenced by shader program and return list of images loaded
+    ImageVec getReferencedImages(const ShaderPtr& shader) override;
 
     /// Return the GL frame buffer.
     GLFrameBufferPtr getFrameBuffer() const
@@ -103,7 +105,7 @@ class GlslRenderer : public ShaderRenderer
     }
 
     /// Submit geometry for a screen-space quad.
-    static void drawScreenSpaceQuad();
+    void drawScreenSpaceQuad();
 
     /// Sets the clear color
     void setClearColor(const Color4& clearColor);
@@ -111,13 +113,10 @@ class GlslRenderer : public ShaderRenderer
     /// @}
 
   protected:
-    GlslRenderer(unsigned int width, unsigned int height, Image::BaseType baseType, const Color4& clearColor = Color4(0.4f, 0.4f, 0.4f, 1.0f));
+    GlslRenderer(unsigned int width, unsigned int height, Image::BaseType baseType);
 
     virtual void updateViewInformation();
     virtual void updateWorldInformation();
-
-  private:
-    void checkErrors();
 
   private:
     GlslProgramPtr _program;
@@ -132,8 +131,7 @@ class GlslRenderer : public ShaderRenderer
     float _objectScale;
 
     SimpleWindowPtr _window;
-    GLUtilityContextPtr _context;
-
+    GLContextPtr _context;
     Color4 _clearColor;
 };
 

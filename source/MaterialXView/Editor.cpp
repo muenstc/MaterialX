@@ -213,11 +213,11 @@ void PropertyEditor::addItemToForm(const mx::UIPropertyItem& item, const std::st
                 MaterialPtr material = viewer->getSelectedMaterial();
                 if (index >= 0 && static_cast<size_t>(index) < enumValues.size())
                 {
-                    material->setUniformInt(path, enumValues[index]->asA<int>());
+                    material->modifyUniform(path, enumValues[index]);
                 }
                 else if (index >= 0 && static_cast<size_t>(index) < enumeration.size())
                 {
-                    material->setUniformEnum(path, index, enumeration[index]);
+                    material->modifyUniform(path, mx::Value::createValue(index), enumeration[index]);
                 }
             });
         }
@@ -238,7 +238,7 @@ void PropertyEditor::addItemToForm(const mx::UIPropertyItem& item, const std::st
                 if (material)
                 {
                     // https://github.com/wjakob/nanogui/issues/205
-                    material->setUniformInt(path, intVar->value());
+                    material->modifyUniform(path, mx::Value::createValue(intVar->value()));
                 }
             });
             if (ui.uiMin)
@@ -267,7 +267,7 @@ void PropertyEditor::addItemToForm(const mx::UIPropertyItem& item, const std::st
             MaterialPtr material = viewer->getSelectedMaterial();
             if (material)
             {
-                material->setUniformFloat(path, value);            
+                material->modifyUniform(path, mx::Value::createValue(value));            
             }
         });
         floatBox->setFixedSize(ng::Vector2i(100, 20));
@@ -290,40 +290,7 @@ void PropertyEditor::addItemToForm(const mx::UIPropertyItem& item, const std::st
             MaterialPtr material = viewer->getSelectedMaterial();
             if (material)
             {
-                material->setUniformFloat(path, (float) v);
-            }
-        });
-    }
-
-    // Color2 input
-    else if (value->isA<mx::Color2>())
-    {
-        ng::Widget* twoColumns = new ng::Widget(container);
-        twoColumns->setLayout(_gridLayout2);
-
-        new ng::Label(twoColumns, label);
-        mx::Color2 v = value->asA<mx::Color2>();
-        ng::Color c;
-        c.r() = v[0];
-        c.g() = v[1];
-        c.b() = 0.0f;
-        c.w() = 1.0f;
-        auto colorVar = new EditorColorPicker(twoColumns, c);
-        colorVar->setFixedSize({ 100, 20 });
-        colorVar->setFontSize(15);
-        colorVar->setFinalCallback([path, viewer, colorVar](const ng::Color &c)
-        {
-            MaterialPtr material = viewer->getSelectedMaterial();
-            if (material)
-            {
-                ng::Vector2f v;
-                v.x() = c.r();
-                v.y() = c.g();
-                material->setUniformVec2(path, v);
-                ng::Color c2 = c;
-                c2.b() = 0.0f;
-                c2.w() = 1.0f;
-                colorVar->setColor(c2);
+                material->modifyUniform(path, mx::Value::createValue((float) v));
             }
         });
     }
@@ -365,12 +332,7 @@ void PropertyEditor::addItemToForm(const mx::UIPropertyItem& item, const std::st
                 {
                     if (index < (int) enumValues.size())
                     {
-                        mx::Color3 c = enumValues[index]->asA<mx::Color3>();
-                        ng::Vector3f v;
-                        v.x() = c[0];
-                        v.y() = c[1];
-                        v.z() = c[2];
-                        material->setUniformVec3(path, v);
+                        material->modifyUniform(path, enumValues[index]);
                     }
                 }
             });
@@ -391,11 +353,11 @@ void PropertyEditor::addItemToForm(const mx::UIPropertyItem& item, const std::st
             colorVar->setFinalCallback([path, viewer](const ng::Color &c)
             {
                 MaterialPtr material = viewer->getSelectedMaterial();
-                ng::Vector3f v;
+                mx::Vector3 v;
                 v[0] = c.r();
                 v[1] = c.g();
                 v[2] = c.b();
-                material->setUniformVec3(path, v);
+                material->modifyUniform(path, mx::Value::createValue(v));
             });
         }
     }
@@ -421,12 +383,12 @@ void PropertyEditor::addItemToForm(const mx::UIPropertyItem& item, const std::st
             MaterialPtr material = viewer->getSelectedMaterial();
             if (material)
             {
-                ng::Vector4f v;
-                v.x() = c.r();
-                v.y() = c.g();
-                v.z() = c.b();
-                v.w() = c.w();
-                material->setUniformVec4(path, v);
+                mx::Vector4 v;
+                v[0] = c.r();
+                v[1] = c.g();
+                v[2] = c.b();
+                v[3] = c.w();
+                material->modifyUniform(path, mx::Value::createValue(v));
             }
         });
     }
@@ -451,10 +413,10 @@ void PropertyEditor::addItemToForm(const mx::UIPropertyItem& item, const std::st
             MaterialPtr material = viewer->getSelectedMaterial();
             if (material)
             {
-                ng::Vector2f v;
-                v.x() = f;
-                v.y() = v2->value();
-                material->setUniformVec2(path, v);
+                mx::Vector2 v;
+                v[0] = f;
+                v[1] = v2->value();
+                material->modifyUniform(path, mx::Value::createValue(v));
             }
         });
         v1->setSpinnable(editable);
@@ -464,11 +426,10 @@ void PropertyEditor::addItemToForm(const mx::UIPropertyItem& item, const std::st
             MaterialPtr material = viewer->getSelectedMaterial();
             if (material)
             {
-                material->getShader()->bind();
-                ng::Vector2f v;
-                v.x() = v1->value();
-                v.y() = f;
-                material->setUniformVec2(path, v);
+                mx::Vector2 v;
+                v[0] = v1->value();
+                v[1] = f;
+                material->modifyUniform(path, mx::Value::createValue(v));
             }
         });
         v2->setSpinnable(editable);
@@ -500,12 +461,11 @@ void PropertyEditor::addItemToForm(const mx::UIPropertyItem& item, const std::st
             MaterialPtr material = viewer->getSelectedMaterial();
             if (material)
             {
-                material->getShader()->bind();
-                ng::Vector3f v;
-                v.x() = f;
-                v.y() = v2->value();
-                v.z() = v3->value();
-                material->setUniformVec3(path, v);
+                mx::Vector3 v;
+                v[0] = f;
+                v[1] = v2->value();
+                v[2] = v3->value();
+                material->modifyUniform(path, mx::Value::createValue(v));
             }
         });
         v1->setSpinnable(editable);
@@ -515,12 +475,11 @@ void PropertyEditor::addItemToForm(const mx::UIPropertyItem& item, const std::st
             MaterialPtr material = viewer->getSelectedMaterial();
             if (material)
             {
-                material->getShader()->bind();
-                ng::Vector3f v;
-                v.x() = v1->value();
-                v.y() = f;
-                v.z() = v3->value();
-                material->setUniformVec3(path, v);
+                mx::Vector3 v;
+                v[0] = v1->value();
+                v[1] = f;
+                v[2] = v3->value();
+                material->modifyUniform(path, mx::Value::createValue(v));
             }
         });
         v2->setSpinnable(editable);
@@ -530,11 +489,11 @@ void PropertyEditor::addItemToForm(const mx::UIPropertyItem& item, const std::st
             MaterialPtr material = viewer->getSelectedMaterial();
             if (material)
             {
-                ng::Vector3f v;
-                v.x() = v1->value();
-                v.y() = v2->value();
-                v.z() = f;
-                material->setUniformVec3(path, v);
+                mx::Vector3 v;
+                v[0] = v1->value();
+                v[1] = v2->value();
+                v[2] = f;
+                material->modifyUniform(path, mx::Value::createValue(v));
             }
         });
         v3->setSpinnable(editable);
@@ -570,12 +529,12 @@ void PropertyEditor::addItemToForm(const mx::UIPropertyItem& item, const std::st
             MaterialPtr material = viewer->getSelectedMaterial();
             if (material)
             {
-                ng::Vector4f v;
-                v.x() = f;
-                v.y() = v2->value();
-                v.z() = v3->value();
-                v.w() = v4->value();
-                material->setUniformVec4(path, v);
+                mx::Vector4 v;
+                v[0] = f;
+                v[1] = v2->value();
+                v[2] = v3->value();
+                v[3] = v4->value();
+                material->modifyUniform(path, mx::Value::createValue(v));
             }
         });
         v1->setSpinnable(editable);
@@ -584,12 +543,12 @@ void PropertyEditor::addItemToForm(const mx::UIPropertyItem& item, const std::st
             MaterialPtr material = viewer->getSelectedMaterial();
             if (material)
             {
-                ng::Vector4f v;
-                v.x() = v1->value();
-                v.y() = f;
-                v.z() = v3->value();
-                v.w() = v4->value();
-                material->setUniformVec4(path, v);
+                mx::Vector4 v;
+                v[0] = v1->value();
+                v[1] = f;
+                v[2] = v3->value();
+                v[3] = v4->value();
+                material->modifyUniform(path, mx::Value::createValue(v));
             }
         });
         v2->setSpinnable(editable);
@@ -599,12 +558,12 @@ void PropertyEditor::addItemToForm(const mx::UIPropertyItem& item, const std::st
             MaterialPtr material = viewer->getSelectedMaterial();
             if (material)
             {
-                ng::Vector4f v;
-                v.x() = v1->value();
-                v.y() = v2->value();
-                v.z() = f;
-                v.w() = v4->value();
-                material->setUniformVec4(path, v);
+                mx::Vector4 v;
+                v[0] = v1->value();
+                v[1] = v2->value();
+                v[2] = f;
+                v[3] = v4->value();
+                material->modifyUniform(path, mx::Value::createValue(v));
             }
         });
         v3->setSpinnable(editable);
@@ -614,12 +573,12 @@ void PropertyEditor::addItemToForm(const mx::UIPropertyItem& item, const std::st
             MaterialPtr material = viewer->getSelectedMaterial();
             if (material)
             {
-                ng::Vector4f v;
-                v.x() = v1->value();
-                v.y() = v2->value();
-                v.z() = v3->value();
-                v.w() = f;
-                material->setUniformVec4(path, v);
+                mx::Vector4 v;
+                v[0] = v1->value();
+                v[1] = v2->value();
+                v[2] = v3->value();
+                v[3] = f;
+                material->modifyUniform(path, mx::Value::createValue(v));
             }
         });
         v4->setSpinnable(editable);
@@ -696,15 +655,14 @@ void PropertyEditor::updateContents(Viewer* viewer)
     create(*viewer);
 
     MaterialPtr material = viewer->getSelectedMaterial();
-    mx::DocumentPtr doc = material ? material->getDocument() : nullptr;
-    if (!doc)
+    if (!material)
     {
         return;
     }
 
     // Shading model display
-    mx::TypedElementPtr elem = material ? material->getElement() : nullptr;
-    std::string shaderName = elem ? elem->getAttribute("node") : mx::EMPTY_STRING;
+    mx::TypedElementPtr elem = material->getElement();
+    std::string shaderName = elem ? elem->getAttribute(mx::NodeDef::NODE_ATTRIBUTE) : mx::EMPTY_STRING;
     if (!shaderName.empty())
     {
         ng::Widget* twoColumns = new ng::Widget(_container);
@@ -723,8 +681,8 @@ void PropertyEditor::updateContents(Viewer* viewer)
         mx::UIPropertyGroup groups;
         mx::UIPropertyGroup unnamedGroups;
         const std::string pathSeparator(":");
-        mx::createUIPropertyGroups(*publicUniforms, doc, material->getElement(),
-                                    pathSeparator, groups, unnamedGroups, true); 
+        mx::createUIPropertyGroups(*publicUniforms, material->getDocument(), elem,
+                                    pathSeparator, groups, unnamedGroups, false); 
 
         std::string previousFolder;
         // Make all inputs editable for now. Could make this read-only as well.

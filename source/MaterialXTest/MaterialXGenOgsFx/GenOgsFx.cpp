@@ -67,7 +67,7 @@ TEST_CASE("GenShader: OGSFX Implementation Check", "[genogsfx]")
 
     mx::StringSet generatorSkipNodeTypes;
     mx::StringSet generatorSkipNodeDefs;
-    GenShaderUtil::checkImplementations(context, generatorSkipNodeTypes, generatorSkipNodeDefs, 66);
+    GenShaderUtil::checkImplementations(context, generatorSkipNodeTypes, generatorSkipNodeDefs, 62);
 }
 
 TEST_CASE("GenShader: OGSFX Unique Names", "[genogsfx]")
@@ -101,7 +101,8 @@ class OgsFxShaderGeneratorTester : public GlslShaderGeneratorTester
         {
             "ambientocclusion", "arrayappend", "backfacing", "screen", "curveadjust", "displacementshader",
             "volumeshader", "IM_constant_", "IM_dot_", "IM_geompropvalue", "IM_light_genglsl",
-            "IM_point_light_genglsl", "IM_spot_light_genglsl", "IM_directional_light_genglsl", "IM_angle", "material", "ND_material" 
+            "IM_point_light_genglsl", "IM_spot_light_genglsl", "IM_directional_light_genglsl", "IM_angle", "material", "ND_material",
+            "ND_backface_util", "IM_backface_util_genglsl"
         };
     }
 };

@@ -18,8 +18,9 @@ namespace Type
     const TypeDesc* THINFILM = TypeDesc::registerType("thinfilm", TypeDesc::BASETYPE_NONE, TypeDesc::SEMANTIC_NONE, 1, false);
 }
 
-const string ThinFilmNode::THICKNESS = "thickness";
-const string ThinFilmNode::IOR       = "ior";
+const string ThinFilmNode::THICKNESS      = "thickness";
+const string ThinFilmNode::IOR            = "ior";
+const string ThinFilmNode::THINFILM_INPUT = "tf";
 
 ShaderNodeImplPtr ThinFilmNode::create()
 {
@@ -37,7 +38,7 @@ void ThinFilmNode::emitFunctionCall(const ShaderNode& node, GenContext& context,
         const ShaderOutput* output = node.getOutput();
         if (!(thickness && ior && output))
         {
-            throw ExceptionShaderGenError("Node '" + node.getName() + "' is not a valid thin_film_brdf node");
+            throw ExceptionShaderGenError("Node '" + node.getName() + "' is not a valid thin_film_bsdf node");
         }
 
         shadergen.emitLine(syntax.getTypeName(Type::THINFILM) + " " + output->getVariable(), stage);
@@ -47,18 +48,16 @@ void ThinFilmNode::emitFunctionCall(const ShaderNode& node, GenContext& context,
     END_SHADER_STAGE(stage, Stage::PIXEL)
 }
 
-
-const string ThinFilmSupport::THINFILM_INPUT = "tf";
-
-ShaderNodeImplPtr ThinFilmSupport::create()
+void ThinFilmNode::addInputs(ShaderNode& node, GenContext&) const
 {
-    return std::make_shared<ThinFilmSupport>();
+    // Add layering support.
+    LayerNode::addLayerSupport(node);
 }
 
-void ThinFilmSupport::addInputs(ShaderNode& node, GenContext&) const
+void ThinFilmNode::addThinFilmSupport(ShaderNode& node)
 {
     // Add the input to hold thinfilm data.
-    node.addInput(THINFILM_INPUT, Type::THINFILM);
+    node.addInput(ThinFilmNode::THINFILM_INPUT, Type::THINFILM);
 }
 
 } // namespace MaterialX

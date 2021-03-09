@@ -92,11 +92,6 @@ void bindPyTypes(py::module& mod)
         .def(py::init<float, float, float, float>())
         .def("asTuple", [](const mx::Vector4& v) { return std::make_tuple(v[0], v[1], v[2], v[3]); });
 
-    py::class_<mx::Color2, mx::VectorBase>(mod, "Color2")
-        BIND_VECTOR_SUBCLASS(mx::Color2, 2)
-        .def(py::init<float, float>())
-        .def("asTuple", [](const mx::Vector2& v) { return std::make_tuple(v[0], v[1]); });
-
     py::class_<mx::Color3, mx::VectorBase>(mod, "Color3")
         BIND_VECTOR_SUBCLASS(mx::Color3, 3)
         .def(py::init<float, float, float>())
@@ -141,6 +136,9 @@ void bindPyTypes(py::module& mod)
     mod.attr("DISPLACEMENT_SHADER_TYPE_STRING") = mx::DISPLACEMENT_SHADER_TYPE_STRING;
     mod.attr("VOLUME_SHADER_TYPE_STRING") = mx::VOLUME_SHADER_TYPE_STRING;
     mod.attr("LIGHT_SHADER_TYPE_STRING") = mx::LIGHT_SHADER_TYPE_STRING;
+    mod.attr("MATERIAL_TYPE_STRING") = mx::MATERIAL_TYPE_STRING;
+    mod.attr("SURFACE_MATERIAL_NODE_STRING") = mx::SURFACE_MATERIAL_NODE_STRING;
+    mod.attr("VOLUME_MATERIAL_NODE_STRING") = mx::VOLUME_MATERIAL_NODE_STRING;
     mod.attr("MULTI_OUTPUT_TYPE_STRING") = mx::MULTI_OUTPUT_TYPE_STRING;
     mod.attr("NONE_TYPE_STRING") = mx::NONE_TYPE_STRING;
     mod.attr("VALUE_STRING_TRUE") = mx::VALUE_STRING_TRUE;

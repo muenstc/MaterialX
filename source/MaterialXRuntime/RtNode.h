@@ -30,6 +30,12 @@ public:
     /// Set the nodedef for this node.
     void setNodeDef(RtPrim prim);
 
+    /// Return the version for this node.
+    const RtToken& getVersion() const;
+
+    /// Set the version for this node.
+    void setVersion(const RtToken& version);
+
     /// Return the number of inputs on the node.
     size_t numInputs() const;
 
@@ -54,8 +60,17 @@ public:
     /// Return an iterator traversing all output attributes
     /// on this node. Shorthand for getPrim().getOutputs().
     RtAttrIterator getOutputs() const;
+
+    /// Returns a vector of public nodegraph metadata names
+    const RtTokenVec& getPublicMetadataNames() const override;
+
+    /// Returns a vector of public metadata names for a port.
+    const RtTokenVec& getPublicPortMetadataNames(const RtToken& name) const override;
+
+
 };
 
 }
 
 #endif
+

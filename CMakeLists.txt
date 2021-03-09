@@ -3,7 +3,7 @@ set(MATERIALX_EMSDK_PATH "" CACHE PATH "Path to EMSDK (e.g. 'C:/emsdk').")
 
 if (MATERIALX_BUILD_JS)
     # Set the the emsdk path
-    if (EXISTS "${MATERIALX_EMSDK_PATH}")        
+    if (EXISTS "${MATERIALX_EMSDK_PATH}")
         set(EMSDK_PATH ${MATERIALX_EMSDK_PATH})
     elseif (EXISTS $ENV{EMSDK})
         set(EMSDK_PATH $ENV{EMSDK})
@@ -57,7 +57,6 @@ set(MATERIALX_PYTHON_PYBIND11_DIR "" CACHE PATH
     "Path to a folder containing the PyBind11 source to be used in building MaterialX Python.")
 
 set(MATERIALX_OIIO_DIR "" CACHE PATH "Path to the root folder of the OpenImageIO installation.")
-set(MATERIALX_DEBUG_POSTFIX "" CACHE STRING "Postfix to append to the target file name for debug configuration (e.g. 'd').")
 
 # Helpers for OSL validation
 set(MATERIALX_TESTOSLC_EXECUTABLE "" CACHE FILEPATH "Full path to the oslc binary.")
@@ -152,7 +151,6 @@ mark_as_advanced(MATERIALX_BUILD_GEN_ARNOLD)
 mark_as_advanced(MATERIALX_BUILD_CROSS)
 mark_as_advanced(MATERIALX_BUILD_GEN)
 mark_as_advanced(MATERIALX_BUILD_CONTRIB)
-mark_as_advanced(MATERIALX_DEBUG_POSTFIX)
 
 if (MATERIALX_BUILD_GEN_MDL)
     mark_as_advanced(MATERIALX_MDLC_EXECUTABLE)
@@ -187,6 +185,9 @@ endif()
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
     set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/installed" CACHE PATH "Default install path" FORCE)
 endif()
+
+# Set the installation path for shared libraries
+set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 
 # Adjust compiler settings
 if(MSVC)
@@ -345,6 +346,10 @@ if(${CMAKE_VERSION} VERSION_GREATER "3.6.2")
         set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT MaterialXTest)
     endif()
 endif()
+
+# Install root-level documents
+install(FILES CHANGELOG.md README.md
+        DESTINATION ${CMAKE_INSTALL_PREFIX})
 
 include(CMakePackageConfigHelpers)
 write_basic_package_version_file(${CMAKE_BINARY_DIR}/cmake/MaterialXConfigVersion.cmake

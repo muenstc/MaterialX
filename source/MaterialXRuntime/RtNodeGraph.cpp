@@ -7,8 +7,11 @@
 #include <MaterialXRuntime/RtPrim.h>
 #include <MaterialXRuntime/RtNode.h>
 #include <MaterialXRuntime/RtConnectableApi.h>
+#include <MaterialXRuntime/Tokens.h>
 
 #include <MaterialXRuntime/Private/PvtPrim.h>
+
+#include <MaterialXCore/Element.h>
 
 namespace MaterialX
 {
@@ -16,7 +19,6 @@ namespace MaterialX
 namespace
 {
     static const RtToken SOCKETS("_nodegraph_internal_sockets");
-    static const RtToken NODEGRAPH1("nodegraph1");
 }
 
 DEFINE_TYPED_SCHEMA(RtNodeGraph, "node:nodegraph");
@@ -25,12 +27,10 @@ const RtTypeInfo RtNodeGraph::SOCKETS_TYPE_INFO("_nodegraph_internal_sockets");
 
 RtPrim RtNodeGraph::createPrim(const RtToken& typeName, const RtToken& name, RtPrim parent)
 {
-    if (typeName != _typeInfo.getShortTypeName())
-    {
-        throw ExceptionRuntimeError("Type names mismatch when creating prim '" + name.str() + "'");
-    }
+    PvtPrim::validateCreation(_typeInfo, typeName, name);
 
-    const RtToken primName = name == EMPTY_TOKEN ? NODEGRAPH1 : name;
+    static const RtToken DEFAULT_NAME("nodegraph1");
+    const RtToken primName = name == EMPTY_TOKEN ? DEFAULT_NAME : name;
     PvtDataHandle primH = PvtPrim::createNew(&_typeInfo, primName, PvtObject::ptr<PvtPrim>(parent));
 
     PvtPrim* prim = primH->asA<PvtPrim>();
@@ -130,7 +130,7 @@ RtNodeLayout RtNodeGraph::getNodeLayout()
     for (RtAttribute input : getInputs())
     {
         layout.order.push_back(input.getName());
-        RtTypedValue* data = input.getMetadata(RtNodeDef::RtNodeDef::UIFOLDER);
+        RtTypedValue* data = input.getMetadata(Tokens::UIFOLDER);
         if (data && data->getType() == RtType::STRING)
         {
             layout.uifolder[input.getName()] = data->getValue().asString();
@@ -184,21 +184,21 @@ void RtNodeGraph::setNodeLayout(const RtNodeLayout& layout)
         auto it = layout.uifolder.find(input.getName());
         if (it != layout.uifolder.end() && !it->second.empty())
         {
-            RtTypedValue* data = input.getMetadata(RtNodeDef::UIFOLDER);
+            RtTypedValue* data = input.getMetadata(Tokens::UIFOLDER);
             if (!data)
             {
-                data = input.addMetadata(RtNodeDef::UIFOLDER, RtType::STRING);
+                data = input.addMetadata(Tokens::UIFOLDER, RtType::STRING);
             }
             else if (data->getType() != RtType::STRING)
             {
-                input.removeMetadata(RtNodeDef::UIFOLDER);
-                data = input.addMetadata(RtNodeDef::UIFOLDER, RtType::STRING);
+                input.removeMetadata(Tokens::UIFOLDER);
+                data = input.addMetadata(Tokens::UIFOLDER, RtType::STRING);
             }
             data->getValue().asString() = it->second;
         }
         else
         {
-            input.removeMetadata(RtNodeDef::UIFOLDER);
+            input.removeMetadata(Tokens::UIFOLDER);
         }
     }
 }
@@ -215,27 +215,15 @@ RtPrimIterator RtNodeGraph::getNodes() const
     return RtPrimIterator(hnd(), predicate);
 }
 
-const RtToken& RtNodeGraph::getVersion() const
-{
-    RtTypedValue* v = prim()->getMetadata(RtNodeDef::VERSION);
-    return v ? v->getValue().asToken() : EMPTY_TOKEN;
-}
-
-void RtNodeGraph::setVersion(const RtToken& value)
-{
-    RtTypedValue* v = prim()->addMetadata(RtNodeDef::VERSION, RtType::TOKEN);
-    v->getValue().asToken() = value;
-}
-
 const RtToken& RtNodeGraph::getDefinition() const
 {
-    RtTypedValue* v = prim()->getMetadata(RtNodeDef::NODEDEF);
+    RtTypedValue* v = prim()->getMetadata(Tokens::NODEDEF);
     return v ? v->getValue().asToken() : EMPTY_TOKEN;
 }
 
 void RtNodeGraph::setDefinition(const RtToken& value)
 {
-    RtTypedValue* v = prim()->addMetadata(RtNodeDef::NODEDEF, RtType::TOKEN);
+    RtTypedValue* v = prim()->addMetadata(Tokens::NODEDEF, RtType::TOKEN);
     v->getValue().asToken() = value;
 }
 

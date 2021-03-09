@@ -3,8 +3,6 @@
 // All rights reserved.  See LICENSE.txt for license.
 //
 
-#ifdef MATERIALX_BUILD_RUNTIME
-
 #include <MaterialXTest/Catch/catch.hpp>
 
 #include <MaterialXCore/Document.h>
@@ -32,9 +30,11 @@
 #include <MaterialXRuntime/RtLook.h>
 #include <MaterialXRuntime/RtCollection.h>
 #include <MaterialXRuntime/RtMessage.h>
+#include <MaterialXRuntime/Tokens.h>
 
 #include <MaterialXRuntime/Commands/PrimCommands.h>
 #include <MaterialXRuntime/Commands/AttributeCommands.h>
+#include <MaterialXRuntime/Commands/MetadataCommands.h>
 #include <MaterialXRuntime/Commands/RelationshipCommands.h>
 #include <MaterialXRuntime/Commands/UndoCommands.h>
 
@@ -73,6 +73,7 @@ namespace
     const mx::RtToken MAIN("main");
     const mx::RtToken LIBS("libs");
     const mx::RtToken NONAME("");
+    const mx::RtToken TARGETS("targets");
     const mx::RtToken STDLIB("stdlib");
     const mx::RtToken PBRLIB("pbrlib");
     const mx::RtToken BXDFLIB("bxdf");
@@ -94,7 +95,7 @@ TEST_CASE("Runtime: Material Element Upgrade", "[runtime]")
     mx::FileSearchPath searchPath(mx::FilePath::getCurrentPath() / mx::FilePath("libraries"));
     api->setSearchPath(searchPath);
     mx::RtReadOptions options;
-    options.applyFutureUpdates = true;
+    api->loadLibrary(TARGETS, options);
     api->loadLibrary(STDLIB, options);
     api->loadLibrary(PBRLIB, options);
     api->loadLibrary(BXDFLIB, options);
@@ -222,8 +223,6 @@ TEST_CASE("Runtime: Values", "[runtime]")
     REQUIRE(value.asInt() == 23);
     mx::RtValue::fromString(mx::RtType::FLOAT, "1234.5678", value);
     REQUIRE(fabs(value.asFloat() - 1234.5678f) < 1e-3f);
-    mx::RtValue::fromString(mx::RtType::COLOR2, "1.0, 2.0", value);
-    REQUIRE(value.asColor2() == mx::Color2(1.0, 2.0));
     mx::RtValue::fromString(mx::RtType::COLOR3, "1.0, 2.0, 3.0", value);
     REQUIRE(value.asColor3() == mx::Color3(1.0, 2.0, 3.0));
     mx::RtValue::fromString(mx::RtType::COLOR4, "1.0, 2.0, 3.0, 4.0", value);
@@ -257,9 +256,6 @@ TEST_CASE("Runtime: Types", "[runtime]")
     const mx::RtTypeDef* booleanType = mx::RtTypeDef::findType(mx::RtType::BOOLEAN);
     REQUIRE(booleanType != nullptr);
     REQUIRE(booleanType->getBaseType() == mx::RtTypeDef::BASETYPE_BOOLEAN);
-    const mx::RtTypeDef* color2Type = mx::RtTypeDef::findType(mx::RtType::COLOR2);
-    REQUIRE(color2Type != nullptr);
-    REQUIRE(color2Type->getBaseType() == mx::RtTypeDef::BASETYPE_FLOAT);
     const mx::RtTypeDef* color3Type = mx::RtTypeDef::findType(mx::RtType::COLOR3);
     REQUIRE(color3Type != nullptr);
     REQUIRE(color3Type->getBaseType() == mx::RtTypeDef::BASETYPE_FLOAT);
@@ -828,7 +824,7 @@ TEST_CASE("Runtime: NodeGraphs", "[runtime]")
     mx::RtNodeDef addgraphDef(addgraphPrim);    
 
     REQUIRE(graph1.getDefinition() == ND_ADDGRAPH);
-    REQUIRE(graph1.getVersion() == ADDGRAPH_VERSION);
+    REQUIRE(graph1.getVersion() == mx::EMPTY_TOKEN);
     REQUIRE(api->hasNodeDef(addgraphDef.getName()));
     REQUIRE(addgraphDef.numInputs() == 2);
     REQUIRE(addgraphDef.numOutputs() == 1);
@@ -841,19 +837,9 @@ TEST_CASE("Runtime: NodeGraphs", "[runtime]")
     addgraphDef.setTarget(ADDGRAPH_TARGET);
     REQUIRE(addgraphDef.getTarget() == ADDGRAPH_TARGET);
 
-    // Check implementation search based on nodegraph.
+    // Check nodegraph implementation search based on nodedef name.
     mx::RtPrim addGraphImpl = stage->getImplementation(addgraphDef);
-    // Exact version check
-    {
-        REQUIRE(addGraphImpl.getPath() == graph1.getPath());
-    }
-    // Bad version check
-    {
-        graph1.setVersion(mx::RtToken("badVersion")); 
-        addGraphImpl = stage->getImplementation(addgraphDef);
-        REQUIRE_FALSE(addGraphImpl.isValid());
-        graph1.setVersion(ADDGRAPH_VERSION);
-    }
+    REQUIRE(addGraphImpl.getPath() == graph1.getPath());
 
     // Check instance creation:
     mx::RtPrim agPrim = stage->createPrim("addgraph1", ND_ADDGRAPH);
@@ -861,11 +847,11 @@ TEST_CASE("Runtime: NodeGraphs", "[runtime]")
     mx::RtNode agNode(agPrim);
     {
         // 1. Metadata like version should be copiedbut not target or node.
-        mx::RtTypedValue* agVersion = agNode.getMetadata(mx::RtNodeDef::VERSION);
+        mx::RtTypedValue* agVersion = agNode.getMetadata(mx::Tokens::VERSION);
         REQUIRE(agVersion->getValueString() == ADDGRAPH_VERSION);
-        mx::RtTypedValue* agTarget = agNode.getMetadata(mx::RtNodeDef::TARGET);
+        mx::RtTypedValue* agTarget = agNode.getMetadata(mx::Tokens::TARGET);
         REQUIRE(!agTarget);
-        mx::RtTypedValue* agNodeValue = agNode.getMetadata(mx::RtNodeDef::NODE);
+        mx::RtTypedValue* agNodeValue = agNode.getMetadata(mx::Tokens::NODE);
         REQUIRE(!agNodeValue);
     }
 
@@ -946,11 +932,11 @@ TEST_CASE("Runtime: NodeGraphs", "[runtime]")
         doc->validate();
         mx::ElementPtr agInstance = doc->getChild("addgraph1");
         REQUIRE(agInstance);
-        bool instanceVersionSaved = agInstance->getAttribute(mx::RtNodeDef::VERSION.str()) == ADDGRAPH_VERSION;
+        bool instanceVersionSaved = agInstance->getAttribute(mx::Tokens::VERSION.str()) == ADDGRAPH_VERSION;
         REQUIRE(instanceVersionSaved);
-        bool instanceTargetNotSaved = agInstance->getAttribute(mx::RtNodeDef::TARGET.str()) == mx::EMPTY_STRING;
+        bool instanceTargetNotSaved = agInstance->getAttribute(mx::Tokens::TARGET.str()) == mx::EMPTY_STRING;
         REQUIRE(instanceTargetNotSaved);
-        bool instanceNodeNotSaved = agInstance->getAttribute(mx::RtNodeDef::NODE.str()) == mx::EMPTY_STRING;
+        bool instanceNodeNotSaved = agInstance->getAttribute(mx::Tokens::NODE.str()) == mx::EMPTY_STRING;
         REQUIRE(instanceNodeNotSaved);
     }
 }
@@ -964,7 +950,7 @@ TEST_CASE("Runtime: FileIo", "[runtime]")
         // Load in stdlib
         api->setSearchPath(searchPath);
         mx::RtReadOptions readOptions;
-        readOptions.applyFutureUpdates = true;
+        api->loadLibrary(TARGETS, readOptions);
         api->loadLibrary(STDLIB, readOptions);
 
         // Create a stage.
@@ -1014,7 +1000,7 @@ TEST_CASE("Runtime: FileIo", "[runtime]")
         // Load in stdlib
         api->setSearchPath(searchPath);
         mx::RtReadOptions options;
-        options.applyFutureUpdates = true;
+        api->loadLibrary(TARGETS, options);
         api->loadLibrary(STDLIB, options);
 
         // Create a new working space stage
@@ -1068,7 +1054,7 @@ TEST_CASE("Runtime: DefaultLook", "[runtime]")
     mx::FileSearchPath searchPath(mx::FilePath::getCurrentPath() / mx::FilePath("libraries"));
     api->setSearchPath(searchPath);
     mx::RtReadOptions options;
-    options.applyFutureUpdates = true;
+    api->loadLibrary(TARGETS, options);
     api->loadLibrary(STDLIB, options);
     api->loadLibrary(PBRLIB, options);
     api->loadLibrary(BXDFLIB, options);
@@ -1100,7 +1086,7 @@ TEST_CASE("Runtime: Namespaced definitions", "[runtime]")
     }
     api->setSearchPath(searchPath);
     mx::RtReadOptions options;
-    options.applyFutureUpdates = true;
+    api->loadLibrary(TARGETS, options);
     api->loadLibrary(STDLIB, options);
     api->loadLibrary(PBRLIB, options);
     api->loadLibrary(BXDFLIB, options);
@@ -1127,7 +1113,7 @@ TEST_CASE("Runtime: Conflict resolution", "[runtime]")
     mx::FileSearchPath searchPath(mx::FilePath::getCurrentPath() / mx::FilePath("libraries"));
     api->setSearchPath(searchPath);
     mx::RtReadOptions options;
-    options.applyFutureUpdates = true;
+    api->loadLibrary(TARGETS, options);
     api->loadLibrary(STDLIB, options);
     api->loadLibrary(PBRLIB, options);
     api->loadLibrary(BXDFLIB, options);
@@ -1210,7 +1196,7 @@ TEST_CASE("Runtime: FileIo NodeGraph", "[runtime]")
     mx::FileSearchPath searchPath(mx::FilePath::getCurrentPath() / mx::FilePath("libraries"));
     api->setSearchPath(searchPath);
     mx::RtReadOptions readOptions;
-    readOptions.applyFutureUpdates = true;
+    api->loadLibrary(TARGETS, readOptions);
     api->loadLibrary(STDLIB, readOptions);
 
     // Create a main stage
@@ -1273,7 +1259,7 @@ TEST_CASE("Runtime: Rename", "[runtime]")
     mx::FileSearchPath searchPath(mx::FilePath::getCurrentPath() / mx::FilePath("libraries"));
     api->setSearchPath(searchPath);
     mx::RtReadOptions options;
-    options.applyFutureUpdates = true;
+    api->loadLibrary(TARGETS, options);
     api->loadLibrary(STDLIB, options);
 
     // Create a main stage
@@ -1316,8 +1302,8 @@ TEST_CASE("Runtime: Stage References", "[runtime]")
     // Load in stdlib
     mx::FileSearchPath searchPath(mx::FilePath::getCurrentPath() / mx::FilePath("libraries"));
     mx::RtReadOptions readOptions;
-    readOptions.applyFutureUpdates = true;
     api->setSearchPath(searchPath);
+    api->loadLibrary(TARGETS, readOptions);
     api->loadLibrary(STDLIB, readOptions);
     api->loadLibrary(PBRLIB, readOptions);
 
@@ -1325,7 +1311,7 @@ TEST_CASE("Runtime: Stage References", "[runtime]")
     mx::RtStagePtr stage = api->createStage(MAIN);
 
     // Test access and usage of contents from the library.
-    mx::RtPrim nodedef = api->getLibrary()->getPrimAtPath("/ND_complex_ior");
+    mx::RtPrim nodedef = api->getLibrary()->getPrimAtPath("/ND_artistic_ior");
     REQUIRE(nodedef.isValid());
     mx::RtNode node1 = stage->createPrim("/nodeA", nodedef.getName());
     REQUIRE(node1.isValid());
@@ -1365,9 +1351,9 @@ TEST_CASE("Runtime: Traversal", "[runtime]")
     api->setSearchPath(searchPath);
 
     mx::RtReadOptions options;
-    options.applyFutureUpdates = true;
 
     // Load in the standard libraries.
+    api->loadLibrary(TARGETS, options);
     api->loadLibrary(STDLIB, options);
     api->loadLibrary(PBRLIB, options);
 
@@ -1393,7 +1379,7 @@ TEST_CASE("Runtime: Traversal", "[runtime]")
     // Loading the same libraries into a MaterialX document
     // and tests the same element counts.
     mx::DocumentPtr doc = mx::createDocument();
-    loadLibraries({ "stdlib", "pbrlib" }, searchPath, doc);
+    loadLibraries({ "targets", "stdlib", "pbrlib" }, searchPath, doc);
     const size_t libNodeCount = doc->getNodes().size();
     const size_t libNodeDefCount = doc->getNodeDefs().size();
     const size_t libNodeGraphCount = doc->getNodeGraphs().size();
@@ -1445,7 +1431,7 @@ TEST_CASE("Runtime: Traversal", "[runtime]")
     mx::RtObjTypePredicate<mx::RtInput> inputFilter;
 
     // Travers a nodedef finding all its inputs.
-    mx::RtNodeDef generalized_schlick_brdf = api->getLibrary()->getPrimAtPath("/ND_generalized_schlick_brdf");
+    mx::RtNodeDef generalized_schlick_brdf = api->getLibrary()->getPrimAtPath("/ND_generalized_schlick_bsdf");
     REQUIRE(generalized_schlick_brdf);
     size_t inputCount = 0;
     for (auto it = generalized_schlick_brdf.getPrim().getAttributes(inputFilter); !it.isDone(); ++it)
@@ -1537,7 +1523,7 @@ TEST_CASE("Runtime: Looks", "[runtime]")
     mx::FileSearchPath searchPath(mx::FilePath::getCurrentPath() / mx::FilePath("libraries"));
     api->setSearchPath(searchPath);
     mx::RtReadOptions libReadOptions;
-    libReadOptions.applyFutureUpdates = true;
+    api->loadLibrary(TARGETS, libReadOptions);
     api->loadLibrary(STDLIB, libReadOptions);
     api->loadLibrary(PBRLIB, libReadOptions);
 
@@ -1612,7 +1598,6 @@ TEST_CASE("Runtime: Looks", "[runtime]")
         readOptions.readLookInformation = true;
         // Do not upgrade on reload:
         mx::DocumentPtr doc = mx::createDocument();
-        readOptions.applyFutureUpdates = false;
 
         mx::RtFileIo stageIo(stage);
         stageIo.write("rtLookExport.mtlx", useOptions ? &writeOptions : nullptr);
@@ -1766,13 +1751,13 @@ TEST_CASE("Runtime: Looks", "[runtime]")
 mx::RtToken toTestResolver(const mx::RtToken& str, const mx::RtToken& type)
 {
     mx::StringResolverPtr resolver = mx::StringResolver::create();
-    return mx::RtToken(resolver->resolve(str, type) + "_toTestResolver");
+    return mx::RtToken(resolver->resolve(str.str(), type.str()) + "_toTestResolver");
 }
 
 mx::RtToken fromTestResolver(const mx::RtToken& str, const mx::RtToken& type)
 {
     mx::StringResolverPtr resolver = mx::StringResolver::create();
-    return mx::RtToken(resolver->resolve(str, type) + "_fromTestResolver");
+    return mx::RtToken(resolver->resolve(str.str(), type.str()) + "_fromTestResolver");
 }
 
 TEST_CASE("Runtime: NameResolvers", "[runtime]")
@@ -1820,7 +1805,7 @@ TEST_CASE("Runtime: libraries", "[runtime]")
     mx::FileSearchPath searchPath(mx::FilePath::getCurrentPath() / mx::FilePath("libraries"));
     api->setSearchPath(searchPath);
     mx::RtReadOptions options;
-    options.applyFutureUpdates = true;
+    api->loadLibrary(TARGETS, options);
     api->loadLibrary(STDLIB, options);
     api->loadLibrary(PBRLIB, options);
     api->loadLibrary(BXDFLIB, options);
@@ -1850,7 +1835,7 @@ TEST_CASE("Runtime: units", "[runtime]")
     mx::FileSearchPath searchPath(mx::FilePath::getCurrentPath() / mx::FilePath("libraries"));
     api->setSearchPath(searchPath);
     mx::RtReadOptions options;
-    options.applyFutureUpdates = true;
+    api->loadLibrary(TARGETS, options);
     api->loadLibrary(STDLIB, options);
     // Load in stdlib twice on purpose to ensure no exception is thrown when trying to add a duplicate unit 
     // definition 
@@ -1881,9 +1866,7 @@ TEST_CASE("Runtime: units", "[runtime]")
         // Test that read and write of files with units works.
         std::stringstream inStream;
         mx::DocumentPtr inDoc = mx::createDocument();
-        mx::XmlReadOptions readOptions;
-        readOptions.applyFutureUpdates = true;
-        mx::readFromXmlFile(inDoc, test, testSearchPath, &readOptions);
+        mx::readFromXmlFile(inDoc, test, testSearchPath);
 
         mx::DocumentPtr outDoc = mx::createDocument();
         std::stringstream outStream;
@@ -1919,7 +1902,7 @@ TEST_CASE("Runtime: Commands", "[runtime]")
     mx::FileSearchPath searchPath(mx::FilePath::getCurrentPath() / mx::FilePath("libraries"));
     api->setSearchPath(searchPath);
     mx::RtReadOptions options;
-    options.applyFutureUpdates = true;
+    api->loadLibrary(TARGETS, options);
     api->loadLibrary(STDLIB, options);
 
     mx::RtStagePtr stage = api->createStage(MAIN);
@@ -2314,6 +2297,101 @@ TEST_CASE("Runtime: Commands", "[runtime]")
     mx::RtCommandResult unknownResult;
     mx::RtCommand::createPrim(stage, mx::RtToken("unknown"), mx::RtPath("/"), mx::EMPTY_TOKEN, unknownResult);
     REQUIRE(!unknownResult);
+
+    //
+    // Test setting metadata
+    //
+    auto setMetadataCallback = [](const mx::RtObject&, const mx::RtToken&, const mx::RtValue&, void* userData)
+    {
+        ++(*reinterpret_cast<size_t*>(userData));
+    };
+    auto removeMetadataCallback = [](const mx::RtObject&, const mx::RtToken&, void* userData)
+    {
+        ++(*reinterpret_cast<size_t*>(userData));
+    };
+    size_t setMetadataCount = 0;
+    size_t removeMetadataCount = 0;
+    mx::RtCallbackId setMetadata_id = mx::RtMessage::addSetMetadataCallback(setMetadataCallback, &setMetadataCount);
+    mx::RtCallbackId removeMetadata_id = mx::RtMessage::addRemoveMetadataCallback(removeMetadataCallback, &removeMetadataCount);
+
+    mx::RtCommandResult metadataResult;
+    mx::RtToken metadata("metadata");
+    std::string metadataValue("some_value");
+    mx::RtCommand::setMetadata(foo, metadata, metadataValue, metadataResult);
+    REQUIRE(metadataResult);
+    REQUIRE(foo.getMetadata(metadata));
+    REQUIRE(foo.getMetadata(metadata)->getValue().asToken() == metadataValue);
+    REQUIRE(setMetadataCount == 1);
+    REQUIRE(removeMetadataCount == 0);
+
+    mx::RtCommand::undo(result);
+    REQUIRE(result);
+    REQUIRE(!foo.getMetadata(metadata));
+    REQUIRE(setMetadataCount == 1);
+    REQUIRE(removeMetadataCount == 1);
+
+    mx::RtCommand::redo(result);
+    REQUIRE(result);
+    REQUIRE(foo.getMetadata(metadata));
+    REQUIRE(foo.getMetadata(metadata)->getValue().asToken() == metadataValue);
+    REQUIRE(setMetadataCount == 2);
+    REQUIRE(removeMetadataCount == 1);
+
+    //
+    // Test changing metadata value
+    //
+    std::string metadataValue2("some_value2");
+    mx::RtCommand::setMetadata(foo, metadata, metadataValue2, metadataResult);
+    REQUIRE(metadataResult);
+    REQUIRE(foo.getMetadata(metadata));
+    REQUIRE(foo.getMetadata(metadata)->getValueString() == metadataValue2);
+    REQUIRE(setMetadataCount == 3);
+    REQUIRE(removeMetadataCount == 1);
+
+    mx::RtCommand::undo(result);
+    REQUIRE(result);
+    REQUIRE(foo.getMetadata(metadata));
+    REQUIRE(foo.getMetadata(metadata)->getValueString() == metadataValue);
+    REQUIRE(setMetadataCount == 4);
+    REQUIRE(removeMetadataCount == 1);
+
+    mx::RtCommand::redo(result);
+    REQUIRE(result);
+    REQUIRE(foo.getMetadata(metadata));
+    REQUIRE(foo.getMetadata(metadata)->getValueString() == metadataValue2);
+    REQUIRE(setMetadataCount == 5);
+    REQUIRE(removeMetadataCount == 1);
+
+    mx::RtCommand::undo(result);
+
+    //
+    // Test removing metadata
+    //
+    setMetadataCount = 0;
+    removeMetadataCount = 0;
+
+    REQUIRE(removeMetadataCount == 0);
+    mx::RtCommand::removeMetadata(foo, metadata, metadataResult);
+    REQUIRE(metadataResult);
+    REQUIRE(!foo.getMetadata(metadata));
+    REQUIRE(setMetadataCount == 0);
+    REQUIRE(removeMetadataCount == 1);
+
+    mx::RtCommand::undo(result);
+    REQUIRE(result);
+    REQUIRE(foo.getMetadata(metadata));
+    REQUIRE(foo.getMetadata(metadata)->getValueString() == metadataValue);
+    REQUIRE(setMetadataCount == 1);
+    REQUIRE(removeMetadataCount == 1);
+
+    mx::RtCommand::redo(result);
+    REQUIRE(result);
+    REQUIRE(!foo.getMetadata(metadata));
+    REQUIRE(setMetadataCount == 1);
+    REQUIRE(removeMetadataCount == 2);
+
+    mx::RtMessage::removeCallback(setMetadata_id);
+    mx::RtMessage::removeCallback(removeMetadata_id);
 }
 
 TEST_CASE("Runtime: graph output connection", "[runtime]")
@@ -2325,7 +2403,7 @@ TEST_CASE("Runtime: graph output connection", "[runtime]")
                                   mx::FilePath("libraries"));
     api->setSearchPath(searchPath);
     mx::RtReadOptions options;
-    options.applyFutureUpdates = true;
+    api->loadLibrary(TARGETS, options);
     api->loadLibrary(STDLIB, options);
     api->loadLibrary(PBRLIB, options);
     api->loadLibrary(BXDFLIB, options);
@@ -2334,10 +2412,10 @@ TEST_CASE("Runtime: graph output connection", "[runtime]")
         "<?xml version=\"1.0\"?>\n"
         "<materialx version=\"1.38\">\n"
         "  <nodegraph name=\"Compound\">\n"
-        "    <output name=\"in\" type=\"color2\" />\n"
+        "    <output name=\"in\" type=\"color3\" />\n"
         "  </nodegraph>\n"
-        "  <clamp name=\"clamp\" type=\"color2\">\n"
-        "    <input name=\"in\" type=\"color2\" nodegraph=\"Compound\" />\n"
+        "  <clamp name=\"clamp\" type=\"color3\">\n"
+        "    <input name=\"in\" type=\"color3\" nodegraph=\"Compound\" />\n"
         "  </clamp>\n"
         "</materialx>";
     mx::RtStagePtr defaultStage = api->createStage(mx::RtToken("defaultStage"));
@@ -2509,5 +2587,3 @@ TEST_CASE("Runtime: duplicate name", "[runtime]")
     REQUIRE(graph1.getOutputSocket(add5));
     REQUIRE(duplicateCount(add5) == 1);
 }
-
-#endif // MATERIALX_BUILD_RUNTIME

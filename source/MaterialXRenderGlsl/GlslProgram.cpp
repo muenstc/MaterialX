@@ -6,6 +6,7 @@
 #include <MaterialXRenderGlsl/External/GLew/glew.h>
 #include <MaterialXRenderGlsl/GlslProgram.h>
 #include <MaterialXRenderGlsl/GLTextureHandler.h>
+#include <MaterialXRenderGlsl/GLUtil.h>
 
 #include <MaterialXRender/ShaderRenderer.h>
 
@@ -26,22 +27,16 @@ int GlslProgram::Input::INVALID_OPENGL_TYPE = -1;
 // GlslProgram methods
 //
 
-GlslProgramPtr GlslProgram::create()
-{
-    return std::shared_ptr<GlslProgram>(new GlslProgram());
-}
-
 GlslProgram::GlslProgram() :
     _programId(UNDEFINED_OPENGL_RESOURCE_ID),
     _shader(nullptr),
-    _vertexArray(0),
+    _vertexArray(UNDEFINED_OPENGL_RESOURCE_ID),
     _lastGeometryName(EMPTY_STRING)
 {
 }
 
 GlslProgram::~GlslProgram()
 {
-    // Clean up the program and offscreen target
     deleteProgram();
 }
 
@@ -248,7 +243,7 @@ bool GlslProgram::bind()
     if (_programId > UNDEFINED_OPENGL_RESOURCE_ID)
     {
         glUseProgram(_programId);
-        checkErrors();
+        checkGlErrors("after program bind");
         return true;
     }
     return false;
@@ -268,7 +263,7 @@ void GlslProgram::bindInputs(ViewHandlerPtr viewHandler,
         throw ExceptionShaderRenderError(errorType, errors);
     }
 
-    checkErrors();
+    checkGlErrors("after program bind inputs");
 
     // Parse for uniforms and attributes
     getUniformsList();
@@ -284,7 +279,7 @@ void GlslProgram::bindInputs(ViewHandlerPtr viewHandler,
     bindViewInformation(viewHandler);
     for (const auto& mesh : geometryHandler->getMeshes())
     {
-        bindStreams(mesh);
+        bindMesh(mesh);
     }
 
     bindTextures(imageHandler);
@@ -368,38 +363,44 @@ void GlslProgram::bindAttribute(const GlslProgram::InputMap& inputs, MeshPtr mes
 
         glEnableVertexAttribArray(location);
         _enabledStreamLocations.insert(location);
-        glVertexAttribPointer(location, stride, GL_FLOAT, GL_FALSE, 0, nullptr);
+        if (input.second->gltype != GL_INT)
+        {
+            glVertexAttribPointer(location, stride, GL_FLOAT, GL_FALSE, 0, nullptr);
+        }
+        else
+        {
+            glVertexAttribIPointer(location, stride, GL_INT, 0, nullptr);
+        }
     }
 }
 
-void GlslProgram::bindPartition(const string& meshName, MeshPartitionPtr partition)
+void GlslProgram::bindPartition(MeshPartitionPtr part)
 {
     StringVec errors;
     const string errorType("GLSL geometry bind error.");
-    if (!partition || partition->getFaceCount() == 0)
+    if (!part || part->getFaceCount() == 0)
     {
         errors.push_back("Cannot bind geometry partition");
         throw ExceptionShaderRenderError(errorType, errors);
     }
 
-    const string identifier = meshName + partition->getIdentifier();
-    if (_indexBufferIds.find(identifier) != _indexBufferIds.end())
+    if (_indexBufferIds.find(part) != _indexBufferIds.end())
     {
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _indexBufferIds[identifier]);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _indexBufferIds[part]);
     }
     else
     {
-        MeshIndexBuffer& indexData = partition->getIndices();
+        MeshIndexBuffer& indexData = part->getIndices();
         size_t indexBufferSize = indexData.size();
         unsigned int indexBuffer = GlslProgram::UNDEFINED_OPENGL_RESOURCE_ID;
         glGenBuffers(1, &indexBuffer);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, indexBufferSize * sizeof(uint32_t), &indexData[0], GL_STATIC_DRAW);
-        _indexBufferIds[identifier] = indexBuffer;
+        _indexBufferIds[part] = indexBuffer;
     }
 }
 
-void GlslProgram::bindStreams(MeshPtr mesh)
+void GlslProgram::bindMesh(MeshPtr mesh)
 {
     _enabledStreamLocations.clear(); 
     StringVec errors;
@@ -412,7 +413,7 @@ void GlslProgram::bindStreams(MeshPtr mesh)
     }
     if (!mesh)
     {
-        errors.push_back("No geometry to bind");
+        errors.push_back("No mesh to bind");
         throw ExceptionShaderRenderError(errorType, errors);
     }
 
@@ -463,7 +464,14 @@ void GlslProgram::bindStreams(MeshPtr mesh)
         bindAttribute(foundList, mesh);
     }
 
-    // Bind any named geometric property information
+    // Bind any named varying geometric property information
+    findInputs(HW::IN_GEOMPROP + "_", attributeList, foundList, false);
+    if (foundList.size())
+    {
+        bindAttribute(foundList, mesh);
+    }
+
+    // Bind any named uniform geometric property information
     const GlslProgram::InputMap& uniformList = getUniformsList();
     findInputs(HW::GEOMPROP + "_", uniformList, foundList, false);
     for (const auto& input : foundList)
@@ -491,7 +499,7 @@ void GlslProgram::bindStreams(MeshPtr mesh)
         }
     }
 
-    checkErrors();
+    checkGlErrors("after program bind mesh");
 }
 
 void GlslProgram::unbindGeometry()
@@ -533,7 +541,7 @@ void GlslProgram::unbindGeometry()
     glDeleteVertexArrays(1, &_vertexArray);
     _vertexArray = GlslProgram::UNDEFINED_OPENGL_RESOURCE_ID;
 
-    checkErrors();
+    checkGlErrors("after program unbind geometry");
 }
 
 ImagePtr GlslProgram::bindTexture(unsigned int uniformType, int uniformLocation, const FilePath& filePath,
@@ -555,7 +563,7 @@ ImagePtr GlslProgram::bindTexture(unsigned int uniformType, int uniformLocation,
                 glUniform1i(uniformLocation, textureLocation);
             }
         }
-        checkErrors();
+        checkGlErrors("after program bind texture");
         return image;
     }
 
@@ -617,9 +625,7 @@ void GlslProgram::bindTextures(ImageHandlerPtr imageHandler)
             }
         }
     }
-    checkErrors();
 }
-
 
 void GlslProgram::bindLighting(LightHandlerPtr lightHandler, ImageHandlerPtr imageHandler)
 {
@@ -768,7 +774,7 @@ void GlslProgram::bindLighting(LightHandlerPtr lightHandler, ImageHandlerPtr ima
                 input = uniformList.find(prefix + "." + lightInput->getName());
                 if (input != uniformList.end())
                 {
-                    bindUniform(input->second->location, *lightInput->getValue());
+                    bindUniformLocation(input->second->location, lightInput->getValue());
                 }
             }
         }
@@ -777,7 +783,35 @@ void GlslProgram::bindLighting(LightHandlerPtr lightHandler, ImageHandlerPtr ima
     }
 }
 
-void GlslProgram::bindUniform(int location, const Value& value)
+bool GlslProgram::hasUniform(const string& name)
+{
+    const GlslProgram::InputMap& uniformList = getUniformsList();
+    return uniformList.find(name) != uniformList.end();
+}
+
+void GlslProgram::bindUniform(const string& name, ConstValuePtr value, bool errorIfMissing)
+{
+    const GlslProgram::InputMap& uniformList = getUniformsList();
+    auto input = uniformList.find(name);
+    if (input != uniformList.end())
+    {
+        int location = input->second->location;
+        if (location < 0)
+        {
+            if (errorIfMissing)
+            {
+                throw ExceptionShaderRenderError(
+                    "GLSL uniform binding error.",
+                    { "Unknown uniform: " + name }
+                );
+            }
+            return;
+        }
+        bindUniformLocation(location, value);
+    }
+}
+
+void GlslProgram::bindUniformLocation(int location, ConstValuePtr value)
 {
     if (_programId == UNDEFINED_OPENGL_RESOURCE_ID)
     {
@@ -787,52 +821,57 @@ void GlslProgram::bindUniform(int location, const Value& value)
         throw ExceptionShaderRenderError(errorType, errors);
     }
 
-    if (location >= 0 && value.getValueString() != EMPTY_STRING)
+    if (location >= 0 && value->getValueString() != EMPTY_STRING)
     {
-        if (value.getTypeString() == "float")
+        if (value->getTypeString() == "float")
         {
-            float v = value.asA<float>();
+            float v = value->asA<float>();
             glUniform1f(location, v);
         }
-        else if (value.getTypeString() == "integer")
+        else if (value->getTypeString() == "integer")
         {
-            int v = value.asA<int>();
+            int v = value->asA<int>();
             glUniform1i(location, v);
         }
-        else if (value.getTypeString() == "boolean")
+        else if (value->getTypeString() == "boolean")
         {
-            bool v = value.asA<bool>();
+            bool v = value->asA<bool>();
             glUniform1i(location, v ? 1 : 0);
         }
-        else if (value.getTypeString() == "color2")
+        else if (value->getTypeString() == "color3")
         {
-            Color2 v = value.asA<Color2>();
-            glUniform2f(location, v[0], v[1]);
-        }
-        else if (value.getTypeString() == "color3")
-        {
-            Color3 v = value.asA<Color3>();
+            Color3 v = value->asA<Color3>();
             glUniform3f(location, v[0], v[1], v[2]);
         }
-        else if (value.getTypeString() == "color4")
+        else if (value->getTypeString() == "color4")
         {
-            Color4 v = value.asA<Color4>();
+            Color4 v = value->asA<Color4>();
             glUniform4f(location, v[0], v[1], v[2], v[3]);
         }
-        else if (value.getTypeString() == "vector2")
+        else if (value->getTypeString() == "vector2")
         {
-            Vector2 v = value.asA<Vector2>();
+            Vector2 v = value->asA<Vector2>();
             glUniform2f(location, v[0], v[1]);
         }
-        else if (value.getTypeString() == "vector3")
+        else if (value->getTypeString() == "vector3")
         {
-            Vector3 v = value.asA<Vector3>();
+            Vector3 v = value->asA<Vector3>();
             glUniform3f(location, v[0], v[1], v[2]);
         }
-        else if (value.getTypeString() == "vector4")
+        else if (value->getTypeString() == "vector4")
         {
-            Vector4 v = value.asA<Vector4>();
+            Vector4 v = value->asA<Vector4>();
             glUniform4f(location, v[0], v[1], v[2], v[3]);
+        }
+        else if (value->getTypeString() == "matrix33")
+        {
+            Matrix33 m = value->asA<Matrix33>();
+            glUniformMatrix3fv(location, 1, GL_FALSE, m.data());
+        }
+        else if (value->getTypeString() == "matrix44")
+        {
+            Matrix44 m = value->asA<Matrix44>();
+            glUniformMatrix4fv(location, 1, GL_FALSE, m.data());
         }
         else
         {
@@ -843,7 +882,6 @@ void GlslProgram::bindUniform(int location, const Value& value)
         }
     }
 }
-
 
 void GlslProgram::bindViewInformation(ViewHandlerPtr viewHandler)
 {
@@ -1028,8 +1066,6 @@ void GlslProgram::bindViewInformation(ViewHandlerPtr viewHandler)
             glUniformMatrix4fv(location, 1, false, viewProjWorld.data());
         }
     } 
-
-    checkErrors();
 }
 
 void GlslProgram::bindTimeAndFrame()
@@ -1069,8 +1105,7 @@ void GlslProgram::bindTimeAndFrame()
     }
 }
 
-
-bool GlslProgram::haveActiveAttributes() const
+bool GlslProgram::hasActiveAttributes() const
 {
     GLint activeAttributeCount = 0;
     if (_programId > UNDEFINED_OPENGL_RESOURCE_ID)
@@ -1083,11 +1118,6 @@ bool GlslProgram::haveActiveAttributes() const
 void GlslProgram::unbind() const
 {
     glUseProgram(0);
-}
-
-bool GlslProgram::geometryBound() const
-{
-    return _vertexArray != UNDEFINED_OPENGL_RESOURCE_ID;
 }
 
 void GlslProgram::clearInputLists()
@@ -1396,9 +1426,9 @@ const GlslProgram::InputMap& GlslProgram::updateAttributesList()
 }
 
 void GlslProgram::findInputs(const string& variable,
-                                         const InputMap& variableList,
-                                         InputMap& foundList,
-                                         bool exactMatch)
+                             const InputMap& variableList,
+                             InputMap& foundList,
+                             bool exactMatch)
 {
     foundList.clear();
 
@@ -1482,21 +1512,6 @@ void GlslProgram::printAttributes(std::ostream& outputStream)
         if (!value.empty())
             outputStream << ". Value: " << value;
         outputStream << "." << std::endl;
-    }
-}
-
-void GlslProgram::checkErrors()
-{
-    StringVec errors;
-
-    GLenum error;
-    while ((error = glGetError()) != GL_NO_ERROR)
-    {
-        errors.push_back("OpenGL error: " + std::to_string(error));
-    }
-    if (!errors.empty())
-    {
-        throw ExceptionShaderRenderError("OpenGL context error.", errors);
     }
 }
 
