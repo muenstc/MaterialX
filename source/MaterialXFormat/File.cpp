@@ -260,12 +260,12 @@ void FilePath::createDirectory() const
 #endif
 }
 
-void FilePath::setCurrentPath() 
+bool FilePath::setCurrentPath() 
 {
 #if defined(_WIN32)
-    _chdir(asString().c_str());
+    return (_chdir(asString().c_str()) == 0);
 #else
-    chdir(asString().c_str());
+    return (chdir(asString().c_str() == 0);
 #endif
 }
 

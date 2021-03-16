@@ -192,7 +192,7 @@ class FilePath
     void createDirectory() const;
 
     /// Set the current working directory of the file system.
-    void setCurrentPath();
+    bool setCurrentPath();
 
     /// @}
 

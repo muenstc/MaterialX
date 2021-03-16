@@ -130,7 +130,7 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
             shaderPath = mx::FilePath(outputFilePath) / arnoldShaderName;
 
             // Write out osl file
-            //if (testOptions.dumpGeneratedCode)
+            if (testOptions.dumpGeneratedCode || testOptions.renderImages)
             {
                 RenderUtil::AdditiveScopedTimer ioTimer(profileTimes.languageTimes.ioTime, "Arnold I/O time");
                 std::ofstream file;
@@ -148,10 +148,14 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
 
                 if (!testRenderer.empty())
                 {
-                    const std::string renderOSL = shaderPath.asString() + ".png";
+                    const std::string IMAGE_CODEC("png");
+                    const std::string renderOSL = shaderPath.asString() + "." + IMAGE_CODEC;
+                    const std::string resolutionString = " -r " + std::to_string(static_cast<int>(testOptions.renderSize[0])) + " " + std::to_string(static_cast<int>(testOptions.renderSize[1]));
+
                     const std::string inputArgs = " -ib -as 1 -i " + oslTemplateFile.asString();
-                    const std::string outputArgs = " -r 512 512 -of png -dw -o " + renderOSL;
+                    const std::string outputArgs = resolutionString + " -of " + IMAGE_CODEC + " -dw -o " + renderOSL;
                     std::string setParameters;
+                    // TODO: These options are for the current OSL shader template. Will be updated to use MTLX shader template.
                     setParameters += " -set osl.shadername ./" + arnoldShaderName;
                     setParameters += " -set /Map__env_image.filename \"" + envMapFile.asString() + "\"";
                     setParameters += " -set options.texture_searchpath \"" + imageSearchPath.asString() + "\"";
@@ -165,14 +169,21 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
                     std::cout << command << std::endl;
 
                     // Switch to path where shader is before running and then switch back.
-                    outputFilePath.setCurrentPath();
-                    int returnValue = std::system(command.c_str());
-                    currentPath.setCurrentPath();
-
-                    std::ifstream errorStream(errorFile);
+                    int returnValue = -1;
                     std::string result;
-                    result.assign(std::istreambuf_iterator<char>(errorStream),
-                        std::istreambuf_iterator<char>());
+                    if (outputFilePath.setCurrentPath())
+                    {
+                        returnValue = std::system(command.c_str());
+                        currentPath.setCurrentPath();
+
+                        std::ifstream errorStream(errorFile);
+                        result.assign(std::istreambuf_iterator<char>(errorStream),
+                            std::istreambuf_iterator<char>());
+                    }
+                    else
+                    {
+                        result = "Failed to set test path: " + outputFilePath.asString();
+                    }
 
                     if (!result.empty())
                     {
@@ -180,7 +191,6 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
                         mx::StringVec errors;
                         errors.push_back("Command string: " + command);
                         errors.push_back("Command return code: " + std::to_string(returnValue));
-                        errors.push_back("Shader failed to compile:");
                         errors.push_back(result);
                     }
                 }
