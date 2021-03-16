@@ -85,6 +85,8 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
         mx::FilePath currentPath = mx::FilePath::getCurrentPath();
         mx::FilePath oslTemplateFile = currentPath / mx::FilePath("resources/Materials/TestSuite/Utilities/arnold_oslTemplate.ass");
         mx::FilePath envMapFile = mx::FilePath::getCurrentPath() / testOptions.radianceIBLPath;
+        const std::string resolutionString = " -r " + std::to_string(static_cast<int>(testOptions.renderSize[0])) + " " + std::to_string(static_cast<int>(testOptions.renderSize[1]));
+        const std::string IMAGE_CODEC("png");
 
         for (const auto& options : optionsList)
         {
@@ -148,10 +150,7 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
 
                 if (!testRenderer.empty())
                 {
-                    const std::string IMAGE_CODEC("png");
                     const std::string renderOSL = shaderPath.asString() + "." + IMAGE_CODEC;
-                    const std::string resolutionString = " -r " + std::to_string(static_cast<int>(testOptions.renderSize[0])) + " " + std::to_string(static_cast<int>(testOptions.renderSize[1]));
-
                     const std::string inputArgs = " -ib -as 1 -i " + oslTemplateFile.asString();
                     const std::string outputArgs = resolutionString + " -of " + IMAGE_CODEC + " -dw -o " + renderOSL;
                     std::string setParameters;

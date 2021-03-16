@@ -265,7 +265,7 @@ bool FilePath::setCurrentPath()
 #if defined(_WIN32)
     return (_chdir(asString().c_str()) == 0);
 #else
-    return (chdir(asString().c_str() == 0);
+    return (chdir(asString().c_str()) == 0);
 #endif
 }
 
