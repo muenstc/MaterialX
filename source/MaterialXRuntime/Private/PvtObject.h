@@ -10,6 +10,8 @@
 #include <MaterialXRuntime/RtToken.h>
 #include <MaterialXRuntime/RtValue.h>
 
+#include <MaterialXRuntime/Private/PvtPath.h>
+
 #include <unordered_map>
 #include <set>
 #include <atomic>
@@ -19,66 +21,6 @@
 
 namespace MaterialX
 {
-
-class PvtPrim;
-class PvtStage;
-class PvtPath;
-
-using PvtDataHandleVec = vector<PvtDataHandle>;
-using PvtDataHandleMap = RtTokenMap<PvtDataHandle>;
-using PvtDataHandleSet = std::set<PvtDataHandle>;
-
-struct PvtDataHandleRecord
-{
-    PvtDataHandleMap map;
-    PvtDataHandleVec vec;
-
-    size_t size() const
-    {
-        return vec.size();
-    }
-
-    PvtDataHandle get(const RtToken& name) const
-    {
-        auto it = map.find(name);
-        return it != map.end() ? it->second : PvtDataHandle();
-    }
-
-    PvtDataHandle get(size_t index) const
-    {
-        return index < vec.size() ? vec[index] : PvtDataHandle();
-    }
-
-    void add(const RtToken& name, const PvtDataHandle& hnd)
-    {
-        map[name] = hnd;
-        vec.push_back(hnd);
-    }
-
-    void remove(const RtToken& name)
-    {
-        auto i = map.find(name);
-        if (i != map.end())
-        {
-            PvtDataHandle hnd = i->second;
-            for (auto j = vec.begin(); j != vec.end(); ++j)
-            {
-                if ((*j).get() == hnd)
-                {
-                    vec.erase(j);
-                    break;
-                }
-            }
-            map.erase(i);
-        }
-    }
-
-    void clear()
-    {
-        map.clear();
-        vec.clear();
-    }
-};
 
 // Class representing an object in the scene hierarchy.
 // This is the base class for prims, attributes and relationships.
@@ -90,7 +32,7 @@ public:
     using TypeBits = uint8_t;
 
 public:
-    virtual ~PvtObject() {}
+    virtual ~PvtObject();
 
     bool isDisposed() const
     {
@@ -157,13 +99,13 @@ public:
     }
 
     // Return a handle for the object.
-    PvtDataHandle hnd() const
+    PvtObjHandle hnd() const
     {
-        return PvtDataHandle(const_cast<PvtObject*>(this));
+        return PvtObjHandle(const_cast<PvtObject*>(this));
     }
 
     // Return a handle for the given object.
-    static PvtDataHandle hnd(const RtObject& obj)
+    static PvtObjHandle hnd(const RtObject& obj)
     {
         return obj.hnd();
     }
@@ -177,7 +119,7 @@ public:
     // Retreive a raw pointer to the private data of an RtObject.
     // NOTE: No type check is performed so the templated type 
     // must be a type supported by the object.
-    template<class T>
+    template<class T = PvtObject>
     static T* ptr(const RtObject& obj)
     {
         return static_cast<T*>(obj.hnd().get());
@@ -199,37 +141,42 @@ public:
 
     RtStageWeakPtr getStage() const;
 
-    RtTypedValue* addMetadata(const RtToken& name, const RtToken& type);
+    RtTypedValue* createAttribute(const RtToken& name, const RtToken& type);
 
-    void removeMetadata(const RtToken& name);
+    void removeAttribute(const RtToken& name);
 
-    // Get metadata without a type check.
-    const RtTypedValue* getMetadata(const RtToken& name) const
+    // Get an attribute without a type check.
+    RtTypedValue* getAttribute(const RtToken& name)
     {
-        auto it = _metadataMap.find(name);
-        return it != _metadataMap.end() ? &it->second : nullptr;
+        auto it = _attr.find(name);
+        return it != _attr.end() ? it->second : nullptr;
     }
 
-    // Get metadata without a type check.
-    RtTypedValue* getMetadata(const RtToken& name)
+    // Get an attribute without a type check.
+    const RtTypedValue* getAttribute(const RtToken& name) const
     {
-        auto it = _metadataMap.find(name);
-        return it != _metadataMap.end() ? &it->second : nullptr;
+        return const_cast<PvtObject*>(this)->getAttribute(name);
     }
 
-    // Get metadata with type check.
-    RtTypedValue* getMetadata(const RtToken& name, const RtToken& type);
+    // Get an attribute with type check.
+    RtTypedValue* getAttribute(const RtToken& name, const RtToken& type);
 
-    // Get metadata with type check.
-    const RtTypedValue* getMetadata(const RtToken& name, const RtToken& type) const
+    // Get an attribute with type check.
+    const RtTypedValue* getAttribute(const RtToken& name, const RtToken& type) const
     {
-        return const_cast<PvtObject*>(this)->getMetadata(name, type);
+        return const_cast<PvtObject*>(this)->getAttribute(name, type);
     }
 
-    // For serialization to file we need the order.
-    const vector<RtToken>& getMetadataOrder() const
+    // Get the map of all attributes.
+    const RtTokenMap<RtTypedValue*>& getAttributes() const
     {
-        return _metadataOrder;
+        return _attr;
+    }
+
+    // Get the vector of all attributes.
+    const RtTokenVec& getAttributeNames() const
+    {
+        return _attrNames;
     }
 
 protected:
@@ -258,14 +205,82 @@ protected:
     TypeBits _typeBits;
     RtToken _name; // TODO: Store a path instead of name token
     PvtPrim* _parent;
-    RtTokenMap<RtTypedValue> _metadataMap;
-    vector<RtToken> _metadataOrder;
+    RtTokenMap<RtTypedValue*> _attr;
+    RtTokenVec _attrNames;
 
     friend class PvtPrim;
-    friend class PvtAttribute;
+    friend class PvtPort;
     friend class PvtInput;
     friend class PvtOutput;
+    friend class PvtNodeGraphPrim;
+    friend class PvtObjectList; 
+    friend class RtAttributeIterator;
     RT_FRIEND_REF_PTR_FUNCTIONS(PvtObject)
+};
+
+
+using PvtObjectVec = vector<PvtObject*>;
+
+// An object container with support for random access, 
+// ordered access and access by name search.
+class PvtObjectList
+{
+public:
+    size_t size() const
+    {
+        return _vec.size();
+    }
+
+    bool empty() const
+    {
+        return _vec.empty();
+    }
+
+    size_t count(const RtToken& name) const
+    {
+        return _map.count(name);
+    }
+
+    PvtObject* find(const RtToken& name) const
+    {
+        auto it = _map.find(name);
+        return it != _map.end() ? it->second.get() : nullptr;
+    }
+
+    PvtObject* operator[](size_t i) const
+    {
+        return i < _vec.size() ? _vec[i] : nullptr;
+    }
+
+    void add(PvtObject* obj)
+    {
+        _map[obj->getName()] = obj->hnd();
+        _vec.push_back(obj);
+    }
+
+    PvtObjHandle remove(const RtToken& name);
+
+    RtToken rename(const RtToken& name, const RtToken& newName, const PvtPrim* parent);
+
+    void clear()
+    {
+        _map.clear();
+        _vec.clear();
+    }
+
+    const PvtObjectVec& vec() const
+    {
+        return _vec;
+    }
+
+private:
+    RtTokenMap<PvtObjHandle> _map;
+    PvtObjectVec _vec;
+
+    friend class RtPrimIterator;
+    friend class RtInputIterator;
+    friend class RtOutputIterator;
+    friend class RtRelationshipIterator;
 };
 
 }

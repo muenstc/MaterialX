@@ -28,32 +28,35 @@ public:
     /// Creating an invalid object.
     RtRelationship() {}
 
-    /// Construct from a data handle.
-    RtRelationship(PvtDataHandle hnd);
+    /// Construct from a handle.
+    RtRelationship(PvtObjHandle hnd);
 
     /// Return the name of this relationship.
     const RtToken& getName() const;
 
-    /// Return true if this relationship has any targets.
-    bool hasTargets() const;
+    /// Connect an object to this relationship.
+    void connect(const RtObject& obj);
 
-    /// Return the number of targets
-    size_t targetCount() const;
+    /// Discconect an object from this relationship.
+    void disconnect(const RtObject& obj);
 
-    /// Add a target to this relationship.
-    void addTarget(const RtObject& target);
+    /// Return true if this relationship has any object connections.
+    bool hasConnections() const;
 
-    /// Remove a target from this relationship.
-    void removeTarget(const RtObject& target);
+    /// Return the number of object connections.
+    size_t numConnections() const;
 
-    /// Clear all targets from this relationship.
-    void clearTargets();
+    /// Return an object by connection index.
+    RtObject getConnection(size_t index = 0) const;
 
-    /// Return an iterator over all targets for this relationship.
-    RtConnectionIterator getTargets() const;
+    /// Return an iterator over all object connections for this relationship.
+    RtConnectionIterator getConnections() const;
 
-    /// Return targets as a string
-    string getTargetsAsString(const string& sep = ",") const;
+    /// Clear all connections from this relationship.
+    void clearConnections();
+
+    /// Return all object names as a string.
+    string getObjectNames() const;
 };
 
 }

@@ -8,6 +8,7 @@
 #include <MaterialXRuntime/Private/PvtStage.h>
 
 #include <set>
+#include <algorithm>
 
 /// @file
 /// TODO: Docs
@@ -24,6 +25,14 @@ PvtObject::PvtObject(const RtToken& name, PvtPrim* parent) :
     _parent(parent)
 {
     setTypeBit<PvtObject>();
+}
+
+PvtObject::~PvtObject()
+{
+    for (auto it : _attr)
+    {
+        delete it.second;
+    }
 }
 
 PvtPath PvtObject::getPath() const
@@ -46,52 +55,89 @@ RtStageWeakPtr PvtObject::getStage() const
     return getRoot()->asA<PvtStage::RootPrim>()->getStage();
 }
 
-RtTypedValue* PvtObject::addMetadata(const RtToken& name, const RtToken& type)
+RtTypedValue* PvtObject::createAttribute(const RtToken& name, const RtToken& type)
 {
-    auto it = _metadataMap.find(name);
-    if (it != _metadataMap.end())
+    RtTypedValue* value = getAttribute(name, type);
+    if (value)
     {
-        // Check if the data type is matching.
-        if (it->second.getType() != type)
-        {
-            throw ExceptionRuntimeError("Metadata '" + name.str() + "' found with an unmatching datatype on object '" + getName().str() +"'");
-        }
-        return &it->second;
+        return value;
     }
 
-    PvtPrim* prim = isA<PvtPrim>() ? asA<PvtPrim>() : _parent;
-    _metadataMap[name] = RtTypedValue(type, RtValue::createNew(type, prim->prim()));
-    _metadataOrder.push_back(name);
+    PvtPrim* owner = isA<PvtPrim>() ? asA<PvtPrim>() : _parent;
+    RtTypedValue* attr = new RtTypedValue(type, RtValue::createNew(type, owner->prim()));
+    _attr[name] = attr;
+    _attrNames.push_back(name);
 
-    return &_metadataMap[name];
+    return attr;
 }
 
-void PvtObject::removeMetadata(const RtToken& name)
+void PvtObject::removeAttribute(const RtToken& name)
 {
-    for (auto it = _metadataOrder.begin(); it != _metadataOrder.end(); ++it)
+    auto it = _attr.find(name);
+    if (it != _attr.end())
     {
-        if (*it == name)
+        RtTypedValue* attr = it->second;
+        for (auto it2 = _attrNames.begin(); it2 != _attrNames.end(); ++it2)
         {
-            _metadataOrder.erase(it);
-            break;
+            if (*it2 == it->first)
+            {
+                _attrNames.erase(it2);
+                break;
+            }
         }
+        _attr.erase(it);
+        delete attr;
     }
-    _metadataMap.erase(name);
 }
 
-RtTypedValue* PvtObject::getMetadata(const RtToken& name, const RtToken& type)
+RtTypedValue* PvtObject::getAttribute(const RtToken& name, const RtToken& type)
 {
-    auto it = _metadataMap.find(name);
-    if (it != _metadataMap.end())
+    RtTypedValue* value = getAttribute(name);
+    if (value && value->getType() != type)
     {
-        // Check if the data type is matching.
-        if (it->second.getType() != type)
-        {
-            throw ExceptionRuntimeError("Metadata '" + name.str() + "' found with an unmatching datatype on object '" + getName().str() + "'");
-        }
-        return &it->second;
+        throw ExceptionRuntimeError("Attribute '" + name.str() + "' found with an unmatching datatype on object '" + getName().str() + "'");
     }
-    return nullptr;
+    return value;
+}
+
+
+PvtObjHandle PvtObjectList::remove(const RtToken& name)
+{
+    auto it = _map.find(name);
+    if (it != _map.end())
+    {
+        PvtObjHandle hnd = it->second;
+        _map.erase(it);
+        _vec.erase(std::find(_vec.begin(), _vec.end(), hnd.get()));
+
+        // Return the handle to keep the object alive
+        // in case the intent was to only remove it
+        // but not destroy it here.
+        return hnd;
+    }
+    return PvtObjHandle();
+}
+
+RtToken PvtObjectList::rename(const RtToken& name, const RtToken& newName, const PvtPrim* parent)
+{
+    auto it = _map.find(name);
+    if (it == _map.end())
+    {
+        throw ExceptionRuntimeError("No object named '" + name.str() + "' exists, unable to rename.");
+    }
+
+    // Remove it from the name map first.
+    // Make sure to hold on to the ref pointer
+    // to keep the object alive.
+    PvtObjHandle hnd = it->second;
+    _map.erase(it);
+
+    // Make sure the new name is unique within the parent.
+    const RtToken finalName = parent->makeUniqueChildName(newName);
+    hnd->setName(finalName);
+    _map[finalName] = hnd;
+
+    return finalName;
 }
 
 }

@@ -32,7 +32,7 @@ PvtStage::PvtStage(const RtToken& name, RtStageWeakPtr owner) :
     _root(nullptr),
     _selfRefCount(0)
 {
-    _root = PvtDataHandle(new RootPrim(owner));
+    _root = PvtObjHandle(new RootPrim(owner));
 }
 
 PvtPrim* PvtStage::createPrim(const PvtPath& path, const RtToken& typeName)
@@ -50,7 +50,7 @@ PvtPrim* PvtStage::createPrim(const PvtPath& parentPath, const RtToken& name, co
         throw ExceptionRuntimeError("Given parent path '" + parentPath.asString() + "' does not point to a prim in this stage");
     }
 
-    PvtDataHandle primH;
+    PvtObjHandle primH;
 
     // First, try finding a registered creator function for this typename.
     RtPrimCreateFunc creator = RtApi::get().getCreateFunction(typeName);
@@ -105,15 +105,20 @@ void PvtStage::disposePrim(const PvtPath& path)
     }
 
     // Make sure the prim has no connections.
-    for (RtAttribute attr : prim->getAttributes())
+    for (size_t i=0; i<prim->numInputs(); ++i)
     {
-        if (attr.isA<RtInput>() && attr.asA<RtInput>().isConnected())
+        const PvtInput* port = prim->getInput(i);
+        if (port->isConnected())
         {
-            throw ExceptionRuntimeError("Found a connection to '" + attr.getName().str() + "'. Cannot dispose a prim with connections.");
+            throw ExceptionRuntimeError("Found a connection to '" + port->getName().str() + "'. Cannot dispose a prim with connections.");
         }
-        else if (attr.isA<RtOutput>() && attr.asA<RtOutput>().isConnected())
+    }
+    for (size_t i = 0; i < prim->numOutputs(); ++i)
+    {
+        const PvtOutput* port = prim->getOutput(i);
+        if (port->isConnected())
         {
-            throw ExceptionRuntimeError("Found a connection from '" + attr.getName().str() + "'. Cannot dispose a prim with connections.");
+            throw ExceptionRuntimeError("Found a connection from '" + port->getName().str() + "'. Cannot dispose a prim with connections.");
         }
     }
 
@@ -150,18 +155,10 @@ RtToken PvtStage::renamePrim(const PvtPath& path, const RtToken& newName)
     PvtPrim* prim = getPrimAtPathLocal(path);
     if (!(prim && prim->getParent()))
     {
-        throw ExceptionRuntimeError("Given path '" + path.asString() + " does not point to a prim in this stage");
+        throw ExceptionRuntimeError("Given path '" + path.asString() + " does not point to a valid prim in this stage");
     }
-
-    // Remove the old name from the name map.
     PvtPrim* parent = prim->getParent();
-    parent->_primMap.erase(prim->getName());
-
-    // Make sure the new name is unique and insert it to the name map.
-    prim->setName(parent->makeUniqueChildName(newName));
-    parent->_primMap[prim->getName()] = prim->hnd();
-
-    return prim->getName();
+    return parent->renameChild(prim->getName(), newName);
 }
 
 RtToken PvtStage::reparentPrim(const PvtPath& path, const PvtPath& newParentPath)
