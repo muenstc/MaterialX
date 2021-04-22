@@ -80,7 +80,7 @@ namespace
         }
     };
 
-    // Commonly used tokens.
+    // Commonly used identifiers.
     const mx::RtIdentifier X("x");
     const mx::RtIdentifier Y("y");
     const mx::RtIdentifier Z("z");
@@ -95,6 +95,7 @@ namespace
     const mx::RtIdentifier IN3("in3");
     const mx::RtIdentifier OUT("out");
     const mx::RtIdentifier IN("in");
+    const mx::RtIdentifier TOKEN1("token1");
     const mx::RtIdentifier REFLECTIVITY("reflectivity");
     const mx::RtIdentifier SURFACESHADER("surfaceshader");
     const mx::RtIdentifier UIFOLDER("uifolder");
@@ -156,7 +157,7 @@ TEST_CASE("Runtime: Material Element Upgrade", "[runtime]")
     }
 }
 
-TEST_CASE("Runtime: Token", "[runtime]")
+TEST_CASE("Runtime: Identifiers", "[runtime]")
 {
     mx::RtIdentifier tok1("hej");
     mx::RtIdentifier tok2("hey");
@@ -829,11 +830,15 @@ TEST_CASE("Runtime: NodeGraphs", "[runtime]")
     // Add an interface to the graph.
     mx::RtInput Ainput = graph1.createInput(A, mx::RtType::FLOAT);
     Ainput.setValueString("0.3");
+    Ainput.setIsUIVisible(false);
     mx::RtInput Binput = graph1.createInput(B, mx::RtType::FLOAT);
     Binput.setValueString("0.1");
+    Binput.setIsUIVisible(true);
     graph1.createOutput(OUT, mx::RtType::FLOAT);
     REQUIRE(graph1.getInput(A));
     REQUIRE(graph1.getInput(B));
+    REQUIRE(graph1.getInput(A).isUIVisible() == false);
+    REQUIRE(graph1.getInput(B).isUIVisible());
     REQUIRE(graph1.getOutput(OUT));
     REQUIRE(graph1.getInputSocket(A));
     REQUIRE(graph1.getInputSocket(B));
@@ -934,6 +939,10 @@ TEST_CASE("Runtime: NodeGraphs", "[runtime]")
     REQUIRE(graph1.getVersion() == mx::EMPTY_IDENTIFIER);
     REQUIRE(graph1.getNamespace() == NAMESPACE);
     REQUIRE(addgraphDef.numInputs() == 2);
+    REQUIRE(addgraphDef.getInput(A));
+    REQUIRE(addgraphDef.getInput(A).isUIVisible() == false);
+    REQUIRE(addgraphDef.getInput(B));
+    REQUIRE(addgraphDef.getInput(B).isUIVisible());
     REQUIRE(addgraphDef.numOutputs() == 1);
     REQUIRE(addgraphDef.getOutput().getName() == OUT);
     REQUIRE(addgraphDef.getName() == QUALIFIED_DEFINITION);
@@ -963,7 +972,7 @@ TEST_CASE("Runtime: NodeGraphs", "[runtime]")
         REQUIRE(!agNodeValue);
     }
 
-    // 2. The assocaited nodedef can be found.
+    // 2. The associated nodedef can be found.
     {
         mx::RtPrim agNodeDefinition = agNode.getNodeDef();
         REQUIRE(agNodeDefinition.getPath() == addgraphDef.getPath());
@@ -1299,20 +1308,36 @@ TEST_CASE("Runtime: FileIo NodeGraph", "[runtime]")
     // Create a nodegraph.
     mx::RtNodeGraph graph = stage->createPrim(mx::RtNodeGraph::typeName());
     graph.createInput(IN, mx::RtType::FLOAT);
+    graph.createInput(TOKEN1, mx::RtType::FLOAT, mx::RtPortFlag::UNIFORM | mx::RtPortFlag::TOKEN);
     graph.createOutput(OUT, mx::RtType::FLOAT);
     mx::RtInput graphIn = graph.getInput(IN);
+    REQUIRE(graphIn.isUIVisible());
+    graphIn.setIsUIVisible(false);
+    REQUIRE(!graphIn.isUIVisible());
+    mx::RtInput graphToken = graph.getInput(TOKEN1);
+    REQUIRE(graphToken.isUniform());
     mx::RtOutput graphOut = graph.getOutput(OUT);
     mx::RtOutput graphInSocket = graph.getInputSocket(IN);
+    mx::RtOutput graphTokenSocket = graph.getInputSocket(TOKEN1);
     mx::RtInput graphOutSocket = graph.getOutputSocket(OUT);
     REQUIRE(graphIn);
+    REQUIRE(graphToken);
     REQUIRE(graphOut);
     REQUIRE(graphInSocket);
+    REQUIRE(graphTokenSocket);
     REQUIRE(graphOutSocket);
 
     // Add nodes to the graph.
     const mx::RtIdentifier ADD_FLOAT_NODEDEF("ND_add_float");
     mx::RtNode add1 = stage->createPrim(graph.getPath(), NONAME, ADD_FLOAT_NODEDEF);
     mx::RtNode add2 = stage->createPrim(graph.getPath(), NONAME, ADD_FLOAT_NODEDEF);
+    try {
+        graphTokenSocket.connect(add1.getInput(IN1));
+    }
+    catch (mx::Exception&)
+    {
+    }
+    REQUIRE(!graphTokenSocket.isConnected());
     graphInSocket.connect(add1.getInput(IN1));
     add1.getOutput(OUT).connect(add2.getInput(IN1));
     add2.getOutput(OUT).connect(graphOutSocket);
@@ -1668,8 +1693,8 @@ TEST_CASE("Runtime: Looks", "[runtime]")
     lookgroup1.removeLook(lo1);
     REQUIRE(lookgroup1.getLooks().numConnections() == 1);
 
-    lookgroup1.setActiveLook("look1");
-    REQUIRE(lookgroup1.getActiveLook() == "look1");
+    lookgroup1.setEnabledLooks("look1");
+    REQUIRE(lookgroup1.getEnabledLooks() == "look1");
 
     lookgroup1.addLook(lo1);
 
@@ -1807,7 +1832,7 @@ TEST_CASE("Runtime: Looks", "[runtime]")
         REQUIRE((*iter) == lo1);
         ++iter;
         REQUIRE(iter.isDone());
-        REQUIRE(lookgroup1.getActiveLook() == "look1");
+        REQUIRE(lookgroup1.getEnabledLooks() == "look1");
 
         // Try again, with options.
         useOptions = true;
@@ -1828,8 +1853,8 @@ TEST_CASE("Runtime: Looks", "[runtime]")
     ++iter;
     REQUIRE(!iter.isDone());
     REQUIRE((*iter) == lo2);
-    lookgroup2.setActiveLook("child_lookgroup");
-    REQUIRE(lookgroup2.getActiveLook() == "child_lookgroup");
+    lookgroup2.setEnabledLooks("child_lookgroup");
+    REQUIRE(lookgroup2.getEnabledLooks() == "child_lookgroup");
 }
 
 mx::RtIdentifier toTestResolver(const mx::RtIdentifier& str, const mx::RtIdentifier& type)
