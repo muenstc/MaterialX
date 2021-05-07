@@ -1,0 +1,64 @@
+
+options
+{
+ AA_samples 1
+ xres 300
+ yres 300
+ texture_per_file_stats on
+ camera "Camera"
+ GI_diffuse_depth 1
+ GI_specular_depth 1
+ GI_transmission_depth 8
+ operator "assign_material"
+}
+
+persp_camera
+{
+ name Camera
+ matrix 1 1 MATRIX
+ 1 0 0 0
+ 0 1 0 0
+ 0 0 1 0
+ 0 0 1.5 1
+ fov 70
+}
+
+image
+{
+ name /environment_map_name
+ filename "environment_map_not_set"
+}
+
+skydome_light
+{
+ matrix
+ -1 0 0 0
+ 0 0 1 0
+ 0 -1 0 0
+ 0 0 0 1
+ name /scene_skydome_light
+ color /environment_map_name
+ camera 1
+ transmission 1
+ resolution 1024
+ format "latlong"
+ portal_mode "interior_exterior"
+}
+
+materialx
+{
+ name assign_material
+ selection "/*"
+ filename "no_materialx_file_set"
+ assign_type "material"
+}
+
+sphere
+{
+ name sphere1
+ matrix 1 1 MATRIX
+ 1 0 0 0
+ 0 1 0 0
+ 0 0 1 0
+ 0 0 0 1
+}

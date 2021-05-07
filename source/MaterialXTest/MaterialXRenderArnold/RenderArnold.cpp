@@ -8,6 +8,7 @@
 
 #include <MaterialXGenShader/Shader.h>
 #include <MaterialXGenShader/Util.h>
+#include <MaterialXFormat/Environ.h>
 
 #include <MaterialXGenArnold/ArnoldShaderGenerator.h>
 
@@ -83,7 +84,8 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
     {
         log << "------------ Run OSL validation with element: " << element->getNamePath() << "-------------------" << std::endl;
         mx::FilePath currentPath = mx::FilePath::getCurrentPath();
-        mx::FilePath oslTemplateFile = currentPath / mx::FilePath("resources/Materials/TestSuite/Utilities/arnold_oslTemplate.ass");
+        //mx::FilePath oslTemplateFile = currentPath / mx::FilePath("resources/Materials/TestSuite/Utilities/arnold_oslTemplate.ass");
+        mx::FilePath templateFile = currentPath / mx::FilePath("resources/Materials/TestSuite/Utilities/arnold_mtlxTemplate.ass");
         mx::FilePath envMapFile = mx::FilePath::getCurrentPath() / testOptions.radianceIBLPath;
         const std::string resolutionString = " -r " + std::to_string(static_cast<int>(testOptions.renderSize[0])) + " " + std::to_string(static_cast<int>(testOptions.renderSize[1]));
         const std::string IMAGE_CODEC("png");
@@ -143,20 +145,21 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
 
             if (testOptions.renderImages)
             {
-                // Run kick to test osl shaders with template file: "arnold_oslTemplate.ass".
-                std::string testRenderer(MATERIALX_ARNOLD_EXECUTABLE);
-                if (testRenderer.empty()) 
-                    testRenderer = "kick";
+                // Run kick to test with template file:
+                std::string testRenderer = mx::getEnviron("MATERIALX_ARNOLD_EXECUTABLE");
+                if (testRenderer.empty())
+                {
+                    testRenderer = std::string(MATERIALX_ARNOLD_EXECUTABLE);
+                }
 
                 if (!testRenderer.empty())
                 {
                     const std::string renderOSL = shaderPath.asString() + "." + IMAGE_CODEC;
-                    const std::string inputArgs = " -ib -as 1 -i " + oslTemplateFile.asString();
+                    const std::string inputArgs = " -ib -as 1 -i " + templateFile.asString();
                     const std::string outputArgs = resolutionString + " -of " + IMAGE_CODEC + " -dw -o " + renderOSL;
                     std::string setParameters;
-                    // TODO: These options are for the current OSL shader template. Will be updated to use MTLX shader template.
-                    setParameters += " -set osl.shadername ./" + arnoldShaderName;
-                    setParameters += " -set /Map__env_image.filename \"" + envMapFile.asString() + "\"";
+                    setParameters += " -set /environment_map_name.filename \"" + envMapFile.asString() + "\"";
+                    setParameters += " -set assign_material.filename \"" + doc->getSourceUri() + "\"";
                     setParameters += " -set options.texture_searchpath \"" + imageSearchPath.asString() + "\"";
 
                     std::string errorFile(shaderPath.asString() + "_compile_errors.txt");
