@@ -5,37 +5,43 @@ options
  xres 300
  yres 300
  texture_per_file_stats on
- camera "Camera"
+ camera "error_camera_not_set"
  GI_diffuse_depth 1
  GI_specular_depth 1
  GI_transmission_depth 8
- operator "assign_material"
+ operator "error_operator_not_set"
 }
 
 persp_camera
 {
- name Camera
- matrix 1 1 MATRIX
- 1 0 0 0
- 0 1 0 0
- 0 0 1 0
- 0 0 1.5 1
- fov 70
+ name unit_camera
+ matrix
+ 0.977415919 1.73472348e-18 0.211324796 0
+ 0.0167213697 0.996864617 -0.0773393959 0
+ -0.210662201 0.0791263953 0.974351287 0
+ -0.761838257 0.286152512 3.52364159 1
+ near_clip 0.100000001
+ far_clip 10000
+ shutter_start 0
+ shutter_end 0
+ shutter_type "box"
+ rolling_shutter "off"
+ rolling_shutter_duration 0
+ motion_start 0
+ motion_end 0
+ exposure 0
+ fov 54.4322243
+ uv_remap 0 0 0 1
 }
 
 image
 {
  name /environment_map_name
- filename "environment_map_not_set"
+ filename "error_environment_map_not_set"
 }
 
 skydome_light
 {
- matrix
- -1 0 0 0
- 0 0 1 0
- 0 -1 0 0
- 0 0 0 1
  name /scene_skydome_light
  color /environment_map_name
  camera 1
@@ -49,16 +55,23 @@ materialx
 {
  name assign_material
  selection "/*"
- filename "no_materialx_file_set"
+ filename "error_materialx_file_not_set"
  assign_type "material"
 }
 
-sphere
+procedural
 {
- name sphere1
- matrix 1 1 MATRIX
+ name geometry_standin
+ visibility 255
+ matrix
  1 0 0 0
  0 1 0 0
  0 0 1 0
  0 0 0 1
+ override_nodes off
+ filename "error_geometry_standin_not_set"
+ auto_instancing on
+ declare dcc_name constant STRING
+ dcc_name "aiStandInShape"
 }
+

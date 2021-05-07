@@ -84,9 +84,11 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
     {
         log << "------------ Run OSL validation with element: " << element->getNamePath() << "-------------------" << std::endl;
         mx::FilePath currentPath = mx::FilePath::getCurrentPath();
-        //mx::FilePath oslTemplateFile = currentPath / mx::FilePath("resources/Materials/TestSuite/Utilities/arnold_oslTemplate.ass");
         mx::FilePath templateFile = currentPath / mx::FilePath("resources/Materials/TestSuite/Utilities/arnold_mtlxTemplate.ass");
+        mx::FilePath geometryFile = currentPath / mx::FilePath("resources/Materials/TestSuite/Utilities/sphere.ass");
         mx::FilePath envMapFile = mx::FilePath::getCurrentPath() / testOptions.radianceIBLPath;
+        std::string materialXOperator = "assign_material";
+        std::string cameraName = "unit_camera";
         const std::string resolutionString = " -r " + std::to_string(static_cast<int>(testOptions.renderSize[0])) + " " + std::to_string(static_cast<int>(testOptions.renderSize[1]));
         const std::string IMAGE_CODEC("png");
 
@@ -159,8 +161,11 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
                     const std::string outputArgs = resolutionString + " -of " + IMAGE_CODEC + " -dw -o " + renderOSL;
                     std::string setParameters;
                     setParameters += " -set /environment_map_name.filename \"" + envMapFile.asString() + "\"";
-                    setParameters += " -set assign_material.filename \"" + doc->getSourceUri() + "\"";
+                    setParameters += " -set options.operator \"" + materialXOperator + "\"";
+                    setParameters += " -set " + materialXOperator + ".filename \"" + doc->getSourceUri() + "\"";
                     setParameters += " -set options.texture_searchpath \"" + imageSearchPath.asString() + "\"";
+                    setParameters += " -set geometry_standin.filename \"" + geometryFile.asString() + "\"";
+                    setParameters += " -set options.camera \"" + cameraName + "\"";                    
 
                     std::string errorFile(shaderPath.asString() + "_compile_errors.txt");
                     const std::string redirectString(" 2>&1");
