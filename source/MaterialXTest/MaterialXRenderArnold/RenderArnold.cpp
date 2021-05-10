@@ -6,6 +6,7 @@
 #include <MaterialXTest/Catch/catch.hpp>
 #include <MaterialXTest/MaterialXRender/RenderUtil.h>
 
+#include <MaterialXFormat/Util.h>
 #include <MaterialXGenShader/Shader.h>
 #include <MaterialXGenShader/Util.h>
 #include <MaterialXFormat/Environ.h>
@@ -77,17 +78,75 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
         }
     }
 
+    // Make a working copy of the document
+    mx::DocumentPtr arnoldDoc = doc->copy();
+    doc = arnoldDoc;
+    element = (doc->getDescendant(element->getNamePath()))->asA<mx::TypedElement>();
+
+    // Create resolver to replace all Windows separators with POSIX ones
+    // and flatten all image filenames
+    mx::StringResolverPtr separatorReplacer = mx::StringResolver::create();
+    separatorReplacer->setFilenameSubstitution("\\\\", "/");
+    separatorReplacer->setFilenameSubstitution("\\", "/");
+    mx::flattenFilenames(doc, imageSearchPath, separatorReplacer);
+
+    // Handle configurations that Arnold does not understand.
+    // For now Arnold only handles rendering materials as roots. For now this means <surfacematerial>
+    // materials nodes only.
+    mx::NodePtr renderMaterial = nullptr;
+    if (element->getType() == mx::SURFACE_SHADER_TYPE_STRING || 
+        element->getType() == mx::DISPLACEMENT_SHADER_TYPE_STRING)
+    {
+        mx::NodePtr shaderNode = element->asA<mx::Node>();
+        for (const mx::NodePtr& material : doc->getMaterialNodes())
+        {
+            for (auto shader : mx::getShaderNodes(material))
+            {
+                if (shader->getNamePath() == element->getNamePath())
+                {
+                    renderMaterial = material;
+                    break;
+                }
+            }
+        }
+
+        // TODO: If there is no <surfacematerial> then create one for the shader 
+        if (!renderMaterial)
+        {
+            renderMaterial = doc->addMaterialNode(doc->createValidChildName(shaderName + "_material"), shaderNode);
+        }
+    }
+    // TODO: Create a unlit shader node and corresponding material
+    else
+    {
+
+    }
+    if (!renderMaterial)
+    {
+        log << "Skip rendering of unsupported element: " + element->getNamePath() << std::endl;
+        return true;
+    }
+
+    // Write a temp file
+    mx::FilePath documentPath(doc->getSourceUri());
+    documentPath.removeExtension();
+    documentPath.addExtension("_arnold.mtlx");
+    mx::writeToXmlFile(doc, documentPath);
+    std::cout << "--- Wrote temp arnold mtlx file to: " << documentPath.asString() << std::endl;
+
     std::vector<mx::GenOptions> optionsList;
     getGenerationOptions(testOptions, context.getOptions(), optionsList);
 
     if (element && doc)
     {
-        log << "------------ Run OSL validation with element: " << element->getNamePath() << "-------------------" << std::endl;
+        log << "------------ Run Arnold validation with element: " << element->getNamePath() << "-------------------" << std::endl;
         mx::FilePath currentPath = mx::FilePath::getCurrentPath();
         mx::FilePath templateFile = currentPath / mx::FilePath("resources/Materials/TestSuite/Utilities/arnold_mtlxTemplate.ass");
         mx::FilePath geometryFile = currentPath / mx::FilePath("resources/Materials/TestSuite/Utilities/sphere.ass");
         mx::FilePath envMapFile = mx::FilePath::getCurrentPath() / testOptions.radianceIBLPath;
         std::string materialXOperator = "assign_material";
+        std::string materialXOperatorAssignType = materialXOperator + ".assign_type";
+        std::string materialXOperatorLook = materialXOperator + ".look";
         std::string cameraName = "unit_camera";
         const std::string resolutionString = " -r " + std::to_string(static_cast<int>(testOptions.renderSize[0])) + " " + std::to_string(static_cast<int>(testOptions.renderSize[1]));
         const std::string IMAGE_CODEC("png");
@@ -160,9 +219,11 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
                     const std::string inputArgs = " -ib -as 1 -i " + templateFile.asString();
                     const std::string outputArgs = resolutionString + " -of " + IMAGE_CODEC + " -dw -o " + renderOSL;
                     std::string setParameters;
-                    setParameters += " -set /environment_map_name.filename \"" + envMapFile.asString() + "\"";
+                    setParameters += " -set " + materialXOperatorAssignType + " \"" + "material" + "\"";
+                    setParameters += " -set " + materialXOperatorLook + " \"" + renderMaterial->getName() + "\"";
+                    setParameters += " -set environment_map_name.filename \"" + envMapFile.asString() + "\"";
                     setParameters += " -set options.operator \"" + materialXOperator + "\"";
-                    setParameters += " -set " + materialXOperator + ".filename \"" + doc->getSourceUri() + "\"";
+                    setParameters += " -set " + materialXOperator + ".filename \"" + documentPath.asString() + "\"";
                     setParameters += " -set options.texture_searchpath \"" + imageSearchPath.asString() + "\"";
                     setParameters += " -set geometry_standin.filename \"" + geometryFile.asString() + "\"";
                     setParameters += " -set options.camera \"" + cameraName + "\"";                    

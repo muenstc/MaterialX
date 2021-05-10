@@ -3,14 +3,10 @@
 ### host app: MtoA 4.1.0 454d6277 (develop) Maya 2020
 ### bounds: -1 -1 -0.994523 1 1 0.994522
 ### user: kwokb
-### render_layer: defaultRenderLayer
-### scene: D:/Work/materialx/arnold_unit_tests/testSphere.ma
-
-
 
 polymesh
 {
- name /pSphere1/pSphereShape1
+ name geometry_sphere
  visibility 255
  sidedness 255
  matrix
@@ -1357,7 +1353,5 @@ polymesh
  smoothing on
  step_size 0
  volume_padding 0
- declare dcc_name constant STRING
- dcc_name "pSphereShape1"
 }
 

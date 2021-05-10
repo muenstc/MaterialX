@@ -10,7 +10,7 @@
 
 polymesh
 {
- name /pGear1/pGearShape1
+ name geometry_gear
  visibility 255
  sidedness 255
  matrix
@@ -2616,7 +2616,5 @@ polymesh
  smoothing on
  step_size 0
  volume_padding 0
- declare dcc_name constant STRING
- dcc_name "pGearShape1"
 }
 
