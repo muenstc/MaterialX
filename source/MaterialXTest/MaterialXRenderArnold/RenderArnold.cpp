@@ -140,25 +140,29 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
         mx::OutputPtr outputPtr = element->asA<mx::Output>();
         if (outputPtr)
         {
-            mx::NodePtr renderShader = doc->addNode("adsk:unit_surface", doc->createValidChildName(shaderName + "shader"), mx::SURFACE_SHADER_TYPE_STRING);
+            mx::NodePtr renderShader = doc->addNode("adsk:unlit_surface", doc->createValidChildName(shaderName + "shader"), mx::SURFACE_SHADER_TYPE_STRING);
             std::cout << "--- Create dummy unlit shader: " << renderShader->getName() << std::endl;
             log << "--- Create dummy unlit shader: " << renderShader->getName() << std::endl;
+            renderShader->setVersionString("1.0");
             mx::InputPtr input = renderShader->addInput("color", outputPtr->getType());
             mx::ElementPtr outputParent = outputPtr->getParent();                       
             if (outputParent->isA<mx::NodeGraph>())
             {
                 mx::NodeGraphPtr outputGraph = outputParent->asA<mx::NodeGraph>();
                 input->setNodeGraphString(outputGraph->getName());
-                if (outputGraph->getOutputCount() > 1)
+                //if (outputGraph->getOutputCount() > 1)
                 {
-                    input->setNodeName(outputPtr->getName());
+                    input->setOutputString(outputPtr->getName());
                 }
             }
             else
             {
-                input->setNodeName(outputPtr->getName());
+                input->setOutputString(outputPtr->getName());
             }
             renderMaterial = doc->addMaterialNode(doc->createValidChildName(shaderName + "_material"), renderShader);
+            mx::InputPtr displShaderInput = renderMaterial->addInput("displacementshader");
+            displShaderInput->setType("displacementshader");
+            displShaderInput->setValue(mx::EMPTY_STRING);
         }
     }
     if (!renderMaterial)
@@ -286,13 +290,21 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
                     log << command << std::endl;
                     std::cout << command << std::endl;
 
+                    // Set environment variable for definition search: ARNOLD_MATERIALX_NODE_DEFINITIONS
+                    const std::string ARNOLD_MATERIALX_NODE_DEFINITIONS_ENV_VAR("ARNOLD_MATERIALX_NODE_DEFINITIONS");
+                    const std::string& prevPath = mx::getEnviron(ARNOLD_MATERIALX_NODE_DEFINITIONS_ENV_VAR);
+                    mx::FileSearchPath definitionSearchPath;
+                    definitionSearchPath.append(mx::FilePath::getCurrentPath() / mx::FilePath("libraries"));
+
                     // Switch to path where shader is before running and then switch back.
                     int returnValue = -1;
                     std::string result;
-                    if (outputFilePath.setCurrentPath())
+                    if (outputFilePath.setCurrentPath() && 
+                        mx::setEnviron(ARNOLD_MATERIALX_NODE_DEFINITIONS_ENV_VAR, definitionSearchPath.asString()))
                     {
                         returnValue = std::system(command.c_str());
                         currentPath.setCurrentPath();
+                        mx::setEnviron(ARNOLD_MATERIALX_NODE_DEFINITIONS_ENV_VAR, prevPath);
 
                         std::ifstream errorStream(errorFile);
                         result.assign(std::istreambuf_iterator<char>(errorStream),
