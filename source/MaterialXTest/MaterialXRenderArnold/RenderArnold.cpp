@@ -13,6 +13,11 @@
 
 #include <MaterialXGenArnold/ArnoldShaderGenerator.h>
 
+#include <MaterialXRender/StbImageLoader.h>
+#if defined(MATERIALX_BUILD_OIIO)
+#include <MaterialXRender/OiioImageLoader.h>
+#endif
+
 namespace mx = MaterialX;
 
 class ArnoldShaderRenderTester : public RenderUtil::ShaderRenderTester
@@ -46,10 +51,20 @@ class ArnoldShaderRenderTester : public RenderUtil::ShaderRenderTester
                       const mx::FileSearchPath& imageSearchPath,
                       const std::string& outputPath = ".",
                       mx::ImageVec* imageVec = nullptr) override;
+
+    mx::ImageHandlerPtr _imageHandler;
 };
 
 void ArnoldShaderRenderTester::createRenderer(std::ostream& /*log*/)
 {
+    mx::StbImageLoaderPtr stbLoader = mx::StbImageLoader::create();
+    _imageHandler = mx::ImageHandler::create(stbLoader);
+    mx::ImageHandlerPtr imageHandler = mx::ImageHandler::create(stbLoader);
+#if defined(MATERIALX_BUILD_OIIO)
+    mx::OiioImageLoaderPtr oiioLoader = mx::OiioImageLoader::create();
+    _imageHandler->addLoader(oiioLoader);
+#endif
+
 }
 
 bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
@@ -88,7 +103,9 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
     mx::StringResolverPtr separatorReplacer = mx::StringResolver::create();
     separatorReplacer->setFilenameSubstitution("\\\\", "/");
     separatorReplacer->setFilenameSubstitution("\\", "/");
-    mx::flattenFilenames(doc, imageSearchPath, separatorReplacer);
+    mx::FileSearchPath flattenSearchPath(mx::FilePath::getCurrentPath());
+    flattenSearchPath.append(imageSearchPath);
+    mx::flattenFilenames(doc, flattenSearchPath, separatorReplacer);
 
     // Handle configurations that Arnold does not understand.
     // For now Arnold only handles rendering materials as roots. For now this means <surfacematerial>
@@ -116,23 +133,56 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
             renderMaterial = doc->addMaterialNode(doc->createValidChildName(shaderName + "_material"), shaderNode);
         }
     }
-    // TODO: Create a unlit shader node and corresponding material
-    else
-    {
 
+    // Create an unlit shader node and corresponding material
+    else 
+    {
+        mx::OutputPtr outputPtr = element->asA<mx::Output>();
+        if (outputPtr)
+        {
+            mx::NodePtr renderShader = doc->addNode("adsk:unit_surface", doc->createValidChildName(shaderName + "shader"), mx::SURFACE_SHADER_TYPE_STRING);
+            std::cout << "--- Create dummy unlit shader: " << renderShader->getName() << std::endl;
+            log << "--- Create dummy unlit shader: " << renderShader->getName() << std::endl;
+            mx::InputPtr input = renderShader->addInput("color", outputPtr->getType());
+            mx::ElementPtr outputParent = outputPtr->getParent();                       
+            if (outputParent->isA<mx::NodeGraph>())
+            {
+                mx::NodeGraphPtr outputGraph = outputParent->asA<mx::NodeGraph>();
+                input->setNodeGraphString(outputGraph->getName());
+                if (outputGraph->getOutputCount() > 1)
+                {
+                    input->setNodeName(outputPtr->getName());
+                }
+            }
+            else
+            {
+                input->setNodeName(outputPtr->getName());
+            }
+            renderMaterial = doc->addMaterialNode(doc->createValidChildName(shaderName + "_material"), renderShader);
+        }
     }
     if (!renderMaterial)
     {
         log << "Skip rendering of unsupported element: " + element->getNamePath() << std::endl;
+        static mx::ImagePtr image;
+        if (!image)
+        {
+            mx::Color4 color(1.0f, 0.0f, 0.0f, 1.0f);
+            image = createUniformImage(1, 1, 4, mx::Image::BaseType::UINT8, color);
+        }
+        const std::string& arnoldShaderName = mx::FilePath(shaderName + "_arnold.png");
+        mx::FilePath shaderPath = mx::FilePath(outputPath) / arnoldShaderName;
+        _imageHandler->saveImage(shaderPath, image);
         return true;
     }
 
     // Write a temp file
     mx::FilePath documentPath(doc->getSourceUri());
     documentPath.removeExtension();
-    documentPath.addExtension("_arnold.mtlx");
+    documentPath.addExtension(shaderName + "_arnold.xml");
     mx::writeToXmlFile(doc, documentPath);
     std::cout << "--- Wrote temp arnold mtlx file to: " << documentPath.asString() << std::endl;
+    log << "--- Wrote temp arnold mtlx file to: " << documentPath.asString() << std::endl;
 
     std::vector<mx::GenOptions> optionsList;
     getGenerationOptions(testOptions, context.getOptions(), optionsList);
@@ -224,7 +274,7 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
                     setParameters += " -set environment_map_name.filename \"" + envMapFile.asString() + "\"";
                     setParameters += " -set options.operator \"" + materialXOperator + "\"";
                     setParameters += " -set " + materialXOperator + ".filename \"" + documentPath.asString() + "\"";
-                    setParameters += " -set options.texture_searchpath \"" + imageSearchPath.asString() + "\"";
+                    setParameters += " -set options.texture_searchpath \"" + flattenSearchPath.asString() + "\"";
                     setParameters += " -set geometry_standin.filename \"" + geometryFile.asString() + "\"";
                     setParameters += " -set options.camera \"" + cameraName + "\"";                    
 
@@ -269,13 +319,14 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
     return true;
 }
 
-TEST_CASE("Render: Arnold TestSuite", "[renderosl]")
+TEST_CASE("Render: Arnold TestSuite", "[renderarnold]")
 {
     ArnoldShaderRenderTester renderTester;
 
-    const mx::FilePath testRootPath = mx::FilePath::getCurrentPath() / mx::FilePath("resources/Materials/TestSuite");
-    const mx::FilePath testRootPath2 = mx::FilePath::getCurrentPath() / mx::FilePath("resources/Materials/Examples/StandardSurface");
-    const mx::FilePath testRootPath3 = mx::FilePath::getCurrentPath() / mx::FilePath("resources/Materials/Examples/UsdPreviewSurface");
+    const mx::FilePath currentPath = mx::FilePath::getCurrentPath();
+    const mx::FilePath testRootPath = currentPath / mx::FilePath("resources/Materials/TestSuite");
+    const mx::FilePath testRootPath2 = currentPath / mx::FilePath("resources/Materials/Examples/StandardSurface");
+    const mx::FilePath testRootPath3 = currentPath / mx::FilePath("resources/Materials/Examples/UsdPreviewSurface");
     mx::FilePathVec testRootPaths;
     testRootPaths.push_back(testRootPath);
     testRootPaths.push_back(testRootPath2);
