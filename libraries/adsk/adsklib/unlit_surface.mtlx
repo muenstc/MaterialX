@@ -1,6 +1,36 @@
 <?xml version="1.0"?>
 <materialx version="1.38">
 
+  <!-- Unlit surface shader (color3 input) -->
+  <nodedef name="ND_unlit_surface_color4" node="unlit_surface" version="1.0" isdefaultversion="true" nodegroup="npbr" namespace="adsk">
+    <input name="color" type="color4" value="1, 1, 1, 1" />
+    <output name="out" type="surfaceshader" value="" />
+  </nodedef>
+  <nodegraph name="NG_unlit_surface_color4" namespace="adsk" nodedef="adsk:ND_unlit_surface_color4" >
+    <input name="color" type="color4" value="1, 1, 1, 1" />
+    <uniform_edf name="uniform_edf" type="EDF" nodedef="ND_uniform_edf" >
+      <input name="color" type="color3" nodename="convert" />
+    </uniform_edf>
+    <constant name="constant" type="color4" nodedef="ND_constant_color4" >
+      <input name="value" type="color4" interfacename="color" value="1, 1, 1, 1" />
+    </constant>
+    <convert name="convert" type="color3" nodedef="ND_convert_color4_color3" >
+      <input name="in" type="color4" nodename="constant" />
+    </convert>
+    <surface name="surface" type="surfaceshader" nodedef="ND_surface" >
+      <input name="bsdf" type="BSDF" value="" />
+      <input name="edf" type="EDF" nodename="uniform_edf" />
+      <input name="opacity" type="float" nodename="swizzle" />
+    </surface>
+    <luminance name="luminance" type="color4" nodedef="ND_luminance_color4" >
+      <input name="in" type="color4" nodename="constant" />
+    </luminance>
+    <swizzle name="swizzle" type="float" nodedef="ND_swizzle_color4_float" >
+      <input name="in" type="color4" nodename="luminance" />
+    </swizzle>
+    <output name="out" type="surfaceshader" nodename="surface" />
+  </nodegraph>
+   
  <!-- Unlit surface shader (color3 input) -->
  <nodedef name="ND_unlit_surface_color3" node="unlit_surface" version="1.0" isdefaultversion="true" nodegroup="npbr" namespace="adsk">
     <input name="color" type="color3" value="1, 1, 1" />
@@ -43,6 +73,34 @@
     </convert>
     <output name="out" type="surfaceshader" nodename="surface" />
   </nodegraph>
+   
+  <!-- Unlit surface shader (vec4 input) -->
+  <nodedef name="ND_unlit_surface_vec4" node="unlit_surface" version="1.0" isdefaultversion="true" namespace="adsk">
+    <input name="color" type="vector4" value="1, 1, 1, 1" />
+    <output name="out" type="surfaceshader" value="" />
+  </nodedef>
+  <nodegraph name="NG_unlit_surface2_vec4" namespace="adsk" nodedef="adsk:ND_unlit_surface_vec4">
+    <input name="value" type="vector4" value="1, 1, 1, 1" />
+    <uniform_edf name="uniform_edf" type="EDF" nodedef="ND_uniform_edf" >
+      <input name="color" type="color3" nodename="swizzle1" />
+    </uniform_edf>
+    <surface name="surface" type="surfaceshader" nodedef="ND_surface" >
+      <input name="bsdf" type="BSDF" value="" />
+      <input name="edf" type="EDF" nodename="uniform_edf" />
+      <input name="opacity" type="float" nodename="swizzle2" />
+    </surface>
+    <constant name="constant" type="vector4" nodedef="ND_constant_vector4" >
+      <input name="value" type="vector4" interfacename="color" value="1, 1, 1, 1" />
+    </constant>
+    <swizzle name="swizzle1" type="color3" nodedef="ND_swizzle_vector4_color3" >
+      <input name="in" type="vector4" nodename="constant" />
+      <input name="channels" type="string" uniform="true" value="xyz" />
+    </swizzle>
+    <swizzle name="swizzle2" type="float" nodedef="ND_swizzle_vector4_float" >
+      <input name="in" type="vector4" nodename="constant" />
+    </swizzle>
+    <output name="out" type="surfaceshader" nodename="surface" />
+  </nodegraph>   
 
   <!-- Unlit surface shader (vec3 input) -->
   <nodedef name="ND_unlit_surface_vec3" node="unlit_surface" version="1.0" isdefaultversion="true" nodegroup="npbr" namespace="adsk">
