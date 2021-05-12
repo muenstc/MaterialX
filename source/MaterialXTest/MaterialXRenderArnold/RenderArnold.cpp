@@ -59,7 +59,6 @@ void ArnoldShaderRenderTester::createRenderer(std::ostream& /*log*/)
 {
     mx::StbImageLoaderPtr stbLoader = mx::StbImageLoader::create();
     _imageHandler = mx::ImageHandler::create(stbLoader);
-    mx::ImageHandlerPtr imageHandler = mx::ImageHandler::create(stbLoader);
 #if defined(MATERIALX_BUILD_OIIO)
     mx::OiioImageLoaderPtr oiioLoader = mx::OiioImageLoader::create();
     _imageHandler->addLoader(oiioLoader);
@@ -140,6 +139,7 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
         mx::OutputPtr outputPtr = element->asA<mx::Output>();
         if (outputPtr)
         {
+            // TODO: Support color4, and vec4 output or add in an unlit variant ?
             mx::NodePtr renderShader = doc->addNode("adsk:unlit_surface", doc->createValidChildName(shaderName + "shader"), mx::SURFACE_SHADER_TYPE_STRING);
             std::cout << "--- Create dummy unlit shader: " << renderShader->getName() << std::endl;
             log << "--- Create dummy unlit shader: " << renderShader->getName() << std::endl;

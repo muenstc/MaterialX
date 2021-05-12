@@ -54,16 +54,6 @@ function argGen(args, defaultArgs = []) {
     return args1;
 }
 
-function catchPtrError(func, handle, args, defaultArgs) {
-    var funcName = func.name;
-    var args1 = argGen(args, defaultArgs);
-    try {
-        return func.apply(handle, args1);
-    } catch (exception) {
-        throw new Error(`${funcName}: ${Module.getExceptionMessage(exception)}`);
-    }
-}
-
 /**
  * This variable is used to specify that a function's parameter is required.
  */
@@ -78,7 +68,8 @@ var REQUIRED = 'requiredArgument';
  */
 function wrapperFunction(func, defaultArgs = []) {
     return function() {
-        var ret = catchPtrError(func, this, arguments, defaultArgs);
+        var args = argGen(arguments, defaultArgs);
+        var ret = func.apply(this, args);
         // Convert the vector into an array.
         if (ret && ret.constructor && ret.constructor.name && ret.constructor.name.indexOf('vector') === 0) {
             ret = vecToArray(ret);
@@ -101,7 +92,11 @@ function wrapperFactory(klass, funcArgOverride = {}) {
         var funcName = funcNames[parseInt(i)];
         var apiFunc = proto[String(funcName)];
         var defaultArgs = funcArgOverride[String(funcName)];
-        proto[String(funcName)] = wrapperFunction(apiFunc, defaultArgs);
+        var wrapperFunc = wrapperFunction(apiFunc, defaultArgs);
+        for (const [key, value] of Object.entries(apiFunc)) {
+            wrapperFunc[key] = value;
+        }
+        proto[String(funcName)] = wrapperFunc;
     }
     return klass;
 }
@@ -120,6 +115,7 @@ Module.onRuntimeInitialized = function() {
         var wrapper = _wrappers[parseInt(i)];
         wrapper(Module, MaterialX);
     }
+    MaterialX['getExceptionMessage'] = Module.getExceptionMessage;
     Module['getMaterialX'] = function() {
         return MaterialX;
     };
