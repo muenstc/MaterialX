@@ -10,6 +10,11 @@ options
  GI_specular_depth 1
  GI_transmission_depth 8
  operator "assign_material"
+ abort_on_error false
+ # For now all bad textures have the same default value as opposed to
+ # per image node in MaterialX
+ error_color_bad_texture 1 0 0
+ error_color_bad_shader 1 0 0
 }
 
 gaussian_filter

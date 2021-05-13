@@ -106,6 +106,11 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
     flattenSearchPath.append(imageSearchPath);
     mx::flattenFilenames(doc, flattenSearchPath, separatorReplacer);
 
+    // Add in a flatten units ?
+    // To ask: how to set up so colorspace results work ?
+    // Still have Prism issues (crashing ???)
+    // Top level outputs ?
+
     // Handle configurations that Arnold does not understand.
     // For now Arnold only handles rendering materials as roots. For now this means <surfacematerial>
     // materials nodes only.
@@ -139,8 +144,7 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
         mx::OutputPtr outputPtr = element->asA<mx::Output>();
         if (outputPtr)
         {
-            // TODO: Support color4, and vec4 output or add in an unlit variant ?
-            mx::NodePtr renderShader = doc->addNode("adsk:unlit_surface", doc->createValidChildName(shaderName + "shader"), mx::SURFACE_SHADER_TYPE_STRING);
+            mx::NodePtr renderShader = doc->addNode("unlit_surface", doc->createValidChildName(shaderName + "shader"), mx::SURFACE_SHADER_TYPE_STRING);
             std::cout << "--- Create dummy unlit shader: " << renderShader->getName() << std::endl;
             log << "--- Create dummy unlit shader: " << renderShader->getName() << std::endl;
             renderShader->setVersionString("1.0");
@@ -150,13 +154,13 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
             {
                 mx::NodeGraphPtr outputGraph = outputParent->asA<mx::NodeGraph>();
                 input->setNodeGraphString(outputGraph->getName());
-                //if (outputGraph->getOutputCount() > 1)
-                {
-                    input->setOutputString(outputPtr->getName());
-                }
+                input->setOutputString(outputPtr->getName());
             }
             else
             {
+                // This does not work for adsk_procedurals.mtlx
+                // output is a top level output connected to a surface shader.
+                //Currently generating the wrong thing
                 input->setOutputString(outputPtr->getName());
             }
             renderMaterial = doc->addMaterialNode(doc->createValidChildName(shaderName + "_material"), renderShader);
@@ -165,18 +169,20 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
             displShaderInput->setValue(mx::EMPTY_STRING);
         }
     }
+
+    static mx::ImagePtr errorImage;
     if (!renderMaterial)
     {
-        log << "Skip rendering of unsupported element: " + element->getNamePath() << std::endl;
-        static mx::ImagePtr image;
-        if (!image)
+        if (!errorImage)
         {
             mx::Color4 color(1.0f, 0.0f, 0.0f, 1.0f);
-            image = createUniformImage(1, 1, 4, mx::Image::BaseType::UINT8, color);
+            errorImage = createUniformImage(1, 1, 4, mx::Image::BaseType::UINT8, color);
         }
         const std::string& arnoldShaderName = mx::FilePath(shaderName + "_arnold.png");
         mx::FilePath shaderPath = mx::FilePath(outputPath) / arnoldShaderName;
-        _imageHandler->saveImage(shaderPath, image);
+        _imageHandler->saveImage(shaderPath, errorImage);
+        log << "- ERROR: Skip rendering of unsupported element: " + element->getNamePath() 
+            << ". Wrote dummy image to: "  << shaderPath.asString() << std::endl;
         return true;
     }
 
@@ -193,6 +199,9 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
 
     if (element && doc)
     {
+        const std::string ARNOLD_ERROR_STRING("ERROR");
+        const std::string ARNOLD_CRASH_STRING("CRASH");
+
         log << "------------ Run Arnold validation with element: " << element->getNamePath() << "-------------------" << std::endl;
         mx::FilePath currentPath = mx::FilePath::getCurrentPath();
         mx::FilePath templateFile = currentPath / mx::FilePath("resources/Materials/TestSuite/Utilities/arnold_mtlxTemplate.ass");
@@ -282,7 +291,7 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
                     setParameters += " -set geometry_standin.filename \"" + geometryFile.asString() + "\"";
                     setParameters += " -set options.camera \"" + cameraName + "\"";                    
 
-                    std::string errorFile(shaderPath.asString() + "_compile_errors.txt");
+                    std::string errorFile(shaderPath.asString() + "arnold_errors.txt");
                     const std::string redirectString(" 2>&1");
 
                     std::string command =  testRenderer + inputArgs + setParameters + outputArgs
@@ -322,6 +331,22 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
                         errors.push_back("Command string: " + command);
                         errors.push_back("Command return code: " + std::to_string(returnValue));
                         errors.push_back(result);
+
+                        // Check for any occurance of an error string in the result.
+                        // If it does then write out a dummy image.
+                        if (result.find(ARNOLD_ERROR_STRING) != std::string::npos ||
+                            result.find(ARNOLD_CRASH_STRING) != std::string::npos)
+                        {
+                            if (!errorImage)
+                            {
+                                mx::Color4 color(0.0f, 0.0f, 1.0f, 1.0f);
+                                errorImage = createUniformImage(1, 1, 4, mx::Image::BaseType::UINT8, color);
+                            }
+                            _imageHandler->saveImage(renderOSL, errorImage);
+                            log << "ERROR: Failed rendering of element: " + element->getNamePath() 
+                                << ". Wrote dummy image to: " << renderOSL << std::endl;
+                            return false;
+                        }
                     }
                 }
             }
