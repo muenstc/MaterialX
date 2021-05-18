@@ -97,7 +97,7 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
     doc = arnoldDoc;
     element = (doc->getDescendant(element->getNamePath()))->asA<mx::TypedElement>();
 
-    // Create resolver to replace all Windows separators with POSIX ones
+    // Prepocess 1: Create resolver to replace all Windows separators with POSIX ones
     // and flatten all image filenames
     mx::StringResolverPtr separatorReplacer = mx::StringResolver::create();
     separatorReplacer->setFilenameSubstitution("\\\\", "/");
@@ -106,12 +106,10 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
     flattenSearchPath.append(imageSearchPath);
     mx::flattenFilenames(doc, flattenSearchPath, separatorReplacer);
 
-    // Add in a flatten units ?
-    // To ask: how to set up so colorspace results work ?
-    // Still have Prism issues (crashing ???)
-    // Top level outputs ?
+    // Prepocess 1a: TODO: 
+    // - possibly add in a "flatten units" utility which will pre-convert units in C++
 
-    // Handle configurations that Arnold does not understand.
+    // Prepocess 2: Handle configurations that Arnold does not understand.
     // For now Arnold only handles rendering materials as roots. For now this means <surfacematerial>
     // materials nodes only.
     mx::NodePtr renderMaterial = nullptr;
@@ -131,7 +129,6 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
             }
         }
 
-        // TODO: If there is no <surfacematerial> then create one for the shader 
         if (!renderMaterial)
         {
             renderMaterial = doc->addMaterialNode(doc->createValidChildName(shaderName + "_material"), shaderNode);
@@ -160,7 +157,7 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
             {
                 // This does not work for adsk_procedurals.mtlx
                 // output is a top level output connected to a surface shader.
-                //Currently generating the wrong thing
+                // TODO: Fix this
                 input->setOutputString(outputPtr->getName());
             }
             renderMaterial = doc->addMaterialNode(doc->createValidChildName(shaderName + "_material"), renderShader);
@@ -170,6 +167,9 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
         }
     }
 
+    // Early exit if can't set up with a <surfacematerial> configuration.
+    // That is the any other element type will not work with the Arnold shader operator
+    // so early exit.
     static mx::ImagePtr errorImage;
     if (!renderMaterial)
     {
@@ -186,7 +186,7 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
         return true;
     }
 
-    // Write a temp file
+    // Write modified for to a temp file and user that for rendering.
     mx::FilePath documentPath(doc->getSourceUri());
     documentPath.removeExtension();
     documentPath.addExtension(shaderName + "_arnold.xml");
@@ -199,9 +199,9 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
 
     if (element && doc)
     {
-        const std::string ARNOLD_ERROR_STRING("ERROR");
         const std::string ARNOLD_CRASH_STRING("CRASH");
 
+        // Set up appropriate parameter inputs for kick
         log << "------------ Run Arnold validation with element: " << element->getNamePath() << "-------------------" << std::endl;
         mx::FilePath currentPath = mx::FilePath::getCurrentPath();
         mx::FilePath templateFile = currentPath / mx::FilePath("resources/Materials/TestSuite/Utilities/arnold_mtlxTemplate.ass");
@@ -332,9 +332,8 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
                         errors.push_back("Command return code: " + std::to_string(returnValue));
                         errors.push_back(result);
 
-                        // Check for any occurance of an error string in the result.
-                        // If it does then write out a dummy image.
-                        if (result.find(ARNOLD_ERROR_STRING) != std::string::npos ||
+                        // On failure, write out a dummy image.
+                        if (returnValue != 0 ||
                             result.find(ARNOLD_CRASH_STRING) != std::string::npos)
                         {
                             if (!errorImage)
