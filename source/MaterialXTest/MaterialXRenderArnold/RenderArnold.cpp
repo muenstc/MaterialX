@@ -106,8 +106,78 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
     flattenSearchPath.append(imageSearchPath);
     mx::flattenFilenames(doc, flattenSearchPath, separatorReplacer);
 
-    // Prepocess 1a: TODO: 
-    // - possibly add in a "flatten units" utility which will pre-convert units in C++
+    // Prepocess to convert units to the final values.
+    // TODO: Make this a utility.
+    mx::UnitSystemPtr unitSystem = shadergen.getUnitSystem();
+    if (unitSystem)
+    {
+        const std::string DISTANCE_TYPE_STRING("distance");
+        const std::string& targetDistanceUnit = context.getOptions().targetDistanceUnit;
+        mx::UnitConverterRegistryPtr unitRegistry = unitSystem->getUnitConverterRegistry();
+        mx::UnitTypeDefPtr distanceTypeDef = doc->getUnitTypeDef(DISTANCE_TYPE_STRING);
+        mx::UnitConverterPtr distanceConverter = unitRegistry->getUnitConverter(distanceTypeDef);
+
+        bool convertedUnits = false;
+        for (mx::ElementPtr elem : doc->traverseTree())
+        {
+            mx::NodePtr pNode = elem->asA<mx::Node>();
+            if (pNode)
+            {
+                if (pNode->getInputCount()) 
+                {
+                    for (mx::InputPtr input : pNode->getInputs()) 
+                    {
+                        const std::string type = input->getType();
+                        const mx::ValuePtr value = input->getValue();
+                        if (value && input->hasUnit() && (input->getUnitType() == DISTANCE_TYPE_STRING) && value) 
+                        {
+                            if (type == "float")
+                            {
+                                float originalval = value->asA<float>();
+                                float convertedValue = distanceConverter->convert(originalval, input->getUnit(), targetDistanceUnit);
+                                input->setValue<float>(convertedValue);
+                                input->removeAttribute(mx::ValueElement::UNIT_ATTRIBUTE);
+                                input->removeAttribute(mx::ValueElement::UNITTYPE_ATTRIBUTE);
+                                convertedUnits = true;
+                            }
+                            else if (type == "vector2")
+                            {
+                                mx::Vector2 originalval = value->asA<mx::Vector2>();
+                                mx::Vector2 convertedValue = distanceConverter->convert(originalval, input->getUnit(), targetDistanceUnit);
+                                input->setValue<mx::Vector2>(convertedValue);
+                                input->removeAttribute(mx::ValueElement::UNIT_ATTRIBUTE);
+                                input->removeAttribute(mx::ValueElement::UNITTYPE_ATTRIBUTE);
+                                convertedUnits = true;
+                            }
+                            else if (type == "vector3")
+                            {
+                                mx::Vector3 originalval = value->asA<mx::Vector3>();
+                                mx::Vector3 convertedValue = distanceConverter->convert(originalval, input->getUnit(), targetDistanceUnit);
+                                input->setValue<mx::Vector3>(convertedValue);
+                                input->removeAttribute(mx::ValueElement::UNIT_ATTRIBUTE);
+                                input->removeAttribute(mx::ValueElement::UNITTYPE_ATTRIBUTE);
+                                convertedUnits = true;
+                            }
+                            else if (type == "vector4")
+                            {
+                                mx::Vector4 originalval = value->asA<mx::Vector4>();
+                                mx::Vector4 convertedValue = distanceConverter->convert(originalval, input->getUnit(), targetDistanceUnit);
+                                input->setValue<mx::Vector4>(convertedValue);
+                                input->removeAttribute(mx::ValueElement::UNIT_ATTRIBUTE);
+                                input->removeAttribute(mx::ValueElement::UNITTYPE_ATTRIBUTE);
+                                convertedUnits = true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (convertedUnits)
+        {
+            log << "- Performed inlined unit converstion" << std::endl;
+        }
+    }
 
     // Prepocess 2: Handle configurations that Arnold does not understand.
     // For now Arnold only handles rendering materials as roots. For now this means <surfacematerial>
@@ -184,6 +254,13 @@ bool ArnoldShaderRenderTester::runRenderer(const std::string& shaderName,
         log << "- ERROR: Skip rendering of unsupported element: " + element->getNamePath() 
             << ". Wrote dummy image to: "  << shaderPath.asString() << std::endl;
         return true;
+    }
+
+    std::string validationString;
+    if (!doc->validate(&validationString))
+    {
+        log << "Document is invalid: " << validationString << std::endl;
+        std::cout << "Document is invalid: " << validationString << std::endl;
     }
 
     // Write modified for to a temp file and user that for rendering.
