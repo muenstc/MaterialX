@@ -57,15 +57,8 @@ void EsslShaderGenerator::emitUniforms(GenContext& context, ShaderStage& stage, 
         if (!uniforms.empty() && uniforms.getName() != HW::LIGHT_DATA)
         {
             emitComment("Uniform block: " + uniforms.getName(), stage);
-            if (resourceBindingCtx)
-            {
-                resourceBindingCtx->emitResourceBindings(context, uniforms, stage);
-            }
-            else
-            {
-                emitVariableDeclarations(uniforms, _syntax->getUniformQualifier(), Syntax::SEMICOLON, context, stage, false);
-                emitLineBreak(stage);
-            }
+            emitVariableDeclarations(uniforms, _syntax->getUniformQualifier(), Syntax::SEMICOLON, context, stage, false);
+            emitLineBreak(stage);
         }
     }
 }
@@ -114,6 +107,15 @@ END_SHADER_STAGE(stage, Stage::PIXEL)
 const string EsslShaderGenerator::getVertexDataPrefix(const VariableBlock&) const
 {
     return "";
+}
+
+const HwResourceBindingContextPtr EsslShaderGenerator::getResourceBindingContext(GenContext& context) const
+{
+    HwResourceBindingContextPtr resoureBindingCtx = GlslShaderGenerator::getResourceBindingContext(context);
+    if (resoureBindingCtx) {
+      throw ExceptionShaderGenError("The EsslShaderGenerator does not support resource binding.");
+    }
+    return resoureBindingCtx;
 }
 
 }
