@@ -47,7 +47,7 @@ BEGIN_SHADER_STAGE(stage, Stage::PIXEL)
 END_SHADER_STAGE(stage, Stage::PIXEL)
 }
 
-void EsslShaderGenerator::emitUniforms(GenContext& context, ShaderStage& stage, HwResourceBindingContextPtr& resourceBindingCtx) const
+void EsslShaderGenerator::emitUniforms(GenContext& context, ShaderStage& stage, HwResourceBindingContextPtr&) const
 {
     for (const auto& it : stage.getUniformBlocks())
     {
