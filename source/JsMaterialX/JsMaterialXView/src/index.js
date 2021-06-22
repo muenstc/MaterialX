@@ -102,33 +102,47 @@ function generateTangents(geometry) {
  * Create a new (half)float texture containing an alpha channel with a value of 1 from a RGB (half)float texture.
  * @param {THREE.Texture} texture 
  */
-function RGBToRGBAFloat(texture) {
-    const origData = texture.image.data;
-    const length = (origData.length / 3) * 4;
-    let data;
+function RGBToRGBA_Float(texture) {
+    const rgbData = texture.image.data;
+    const length = (rgbData.length / 3) * 4;
+    let rgbaData;
 
     switch (texture.type) {
         case THREE.FloatType:
-            data = new Float32Array(length);
+            rgbaData = new Float32Array(length);
             break;
         case THREE.HalfFloatType:
-            data = new Uint16Array(length);
+            rgbaData = new Uint16Array(length);
             break;
         default:
           break;
     }
 
-    if (data) {
+    if (rgbaData) {
         for (let i = 0; i < length / 4; i++) {
-            data[ (i * 4) + 0 ] = origData[ (i * 3) + 0 ];
-            data[ (i * 4) + 1 ] = origData[ (i * 3) + 1 ];
-            data[ (i * 4) + 2 ] = origData[ (i * 3) + 2 ];
-            data[ (i * 4) + 3 ] = 1.0;
+            rgbaData[(i * 4) + 0] = rgbData[(i * 3) + 0];
+            rgbaData[(i * 4) + 1] = rgbData[(i * 3) + 1];
+            rgbaData[(i * 4) + 2] = rgbData[(i * 3) + 2];
+            rgbaData[(i * 4) + 3] = 1.0;
         }
-        return new THREE.DataTexture(data, texture.image.width, texture.image.height, THREE.RGBAFormat, texture.type);
+        return new THREE.DataTexture(rgbaData, texture.image.width, texture.image.height, THREE.RGBAFormat, texture.type);
     }
 
     return texture;
+}
+
+function prepareEnvTexture(texture, capabilities) {
+    const rgbaTexture = RGBToRGBA_Float(texture);
+    // RGBELoader sets flipY to true by default
+    rgbaTexture.flipY = false;
+    rgbaTexture.wrapS = THREE.RepeatWrapping;
+    rgbaTexture.anisotropy = capabilities.getMaxAnisotropy();
+    rgbaTexture.minFilter = THREE.LinearMipmapLinearFilter;
+    rgbaTexture.magFilter = THREE.LinearFilter;
+    rgbaTexture.generateMipmaps = true;
+    rgbaTexture.needsUpdate = true;
+
+    return rgbaTexture;
 }
 
 function init() {
@@ -181,25 +195,8 @@ function init() {
         new Promise(resolve => fileloader.load('shader-vert.glsl', resolve))
     ]).then(([loadedRadianceTexture, loadedIrradianceTexture, obj, fShader, vShader]) => {
 
-        const radianceTexture = RGBToRGBAFloat(loadedRadianceTexture);
-        const irradianceTexture = RGBToRGBAFloat(loadedIrradianceTexture);
-
-        // RGBELoader sets flipY to true by default
-        radianceTexture.flipY = false;
-        radianceTexture.wrapS = THREE.RepeatWrapping;
-        radianceTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
-        radianceTexture.minFilter = THREE.LinearMipmapLinearFilter;
-        radianceTexture.magFilter = THREE.LinearFilter;
-        radianceTexture.generateMipmaps = true;
-        radianceTexture.needsUpdate = true;
-        
-        irradianceTexture.flipY = false;
-        irradianceTexture.wrapS = THREE.RepeatWrapping;
-        irradianceTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
-        irradianceTexture.minFilter = THREE.LinearMipmapLinearFilter;
-        irradianceTexture.magFilter = THREE.LinearFilter;
-        irradianceTexture.generateMipmaps = true;
-        irradianceTexture.needsUpdate = true;
+        const radianceTexture = prepareEnvTexture(loadedRadianceTexture, renderer.capabilities);
+        const irradianceTexture = prepareEnvTexture(loadedIrradianceTexture, renderer.capabilities);
 
         const material = new THREE.RawShaderMaterial({
             uniforms: { 
