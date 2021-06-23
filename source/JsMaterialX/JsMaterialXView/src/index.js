@@ -247,7 +247,7 @@ function init() {
 
               u_envMatrix: {value: new THREE.Matrix4().makeRotationY(Math.PI)},
               u_envRadiance: {value: radianceTexture},
-              u_envRadianceMips: {value: Math.log2(Math.max(radianceTexture.image.width, radianceTexture.image.height)) + 1},
+              u_envRadianceMips: {value: Math.trunc(Math.log2(Math.max(radianceTexture.image.width, radianceTexture.image.height))) + 1},
               u_envRadianceSamples: {value: 16},
               u_envIrradiance: {value: irradianceTexture},
 
