@@ -12,9 +12,9 @@ module.exports = {
     new CopyPlugin({
       patterns: [
         { from: "../../../resources" },
-        { from: "../../../build/source/JsMaterialX/JsMaterialXGenShader.wasm" },
-        { from: "../../../build/source/JsMaterialX/JsMaterialXGenShader.js" },
-        { from: "../../../build/source/JsMaterialX/JsMaterialXGenShader.data" },
+        { from: "../../../build/bin/JsMaterialXGenShader.wasm" },
+        { from: "../../../build/bin/JsMaterialXGenShader.js" },
+        { from: "../../../build/bin/JsMaterialXGenShader.data" },
       ],
     }),
   ],
