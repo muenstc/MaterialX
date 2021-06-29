@@ -238,7 +238,6 @@ function getWrapping(mode) {
         case 3:
             wrap = THREE.MirroredRepeatWrapping;
             break;
-        case 1:
         default:
             wrap = THREE.RepeatWrapping;
             break;
