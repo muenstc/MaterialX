@@ -167,7 +167,7 @@ function toArray(value, dimension) {
     return outValue;
 }
 
-function toThreeUniform(type, value) {
+function toThreeUniform(type, value, name, uniformJSON, textureLoader) {
     let outValue;  
     switch(type) {
         case 'int':
@@ -199,6 +199,12 @@ function toThreeUniform(type, value) {
             outValue = toArray(value, 16);
             break;
         case 'sampler2D':
+            if (value) {
+                const texture = textureLoader.load(value);
+                // Set address & filtering mode
+                setTextureParameters(texture, name, uniformJSON);
+                outValue = texture;
+            } 
             break;
         case 'samplerCube':
               break;        
@@ -212,15 +218,8 @@ function toThreeUniform(type, value) {
 
 function toThreeUniforms(uniformJSON, textureLoader) {
     let threeUniforms = {};
-    let value;
     for (const [name, description] of Object.entries(uniformJSON)) {
-        threeUniforms[name] = new THREE.Uniform(toThreeUniform(description.type, description.value, textureLoader));
-        if (description.type === "sampler2D" && description.value) {
-            const texture = textureLoader.load(description.value);
-            // Set address & filtering mode
-            setTextureParameters(texture, name, uniformJSON);
-            threeUniforms[name].value = texture;
-        }
+        threeUniforms[name] = new THREE.Uniform(toThreeUniform(description.type, description.value, name, uniformJSON, textureLoader));
     }
 
     return threeUniforms;
