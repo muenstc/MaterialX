@@ -1,5 +1,4 @@
-const chai = require('chai');
-const expect = chai.expect;
+import MaterialX from '../_build/JsMaterialXGenShader.js';
 
 function createStandardSurfaceMaterial(mx) {
     const doc = mx.createDocument();
@@ -16,10 +15,11 @@ function createStandardSurfaceMaterial(mx) {
 
 describe('Generate ESSL Shaders', () => {
     let mx;
-    let canvas = document.getElementById('canvas');
+    let canvas = document.createElement('canvas');
     let gl = canvas.getContext('webgl2');
 
-    before(async () => {
+    before(async function () {
+        this.timeout(100000);
         mx = await MaterialX();
     });
 
@@ -48,5 +48,5 @@ describe('Generate ESSL Shaders', () => {
 
         expect(gl.getShaderParameter(glVertexShader, gl.COMPILE_STATUS)).to.equal(true);
         expect(gl.getShaderParameter(glPixelShader, gl.COMPILE_STATUS)).to.equal(true);
-    });
+    }).timeout(100000);
 }).timeout(100000);

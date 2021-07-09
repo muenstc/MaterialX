@@ -1,10 +1,11 @@
 const path = require('path');
 const CopyPlugin = require("copy-webpack-plugin");
+const HtmlWebpackPlugin = require('html-webpack-plugin');
 
 module.exports = {
   entry: './browser/index.js',
   output: {
-    filename: 'test.build.js',
+    filename: 'browser.test.js',
     path: path.resolve(__dirname, 'dist'),
     publicPath: '/browser'
   },
@@ -12,17 +13,21 @@ module.exports = {
     open: true,
     openPage: 'browser'
   },
+  resolve: {
+    fallback: {
+      fs: false,
+      path: false,
+      crypto: false,
+    }
+  },
   mode: "development",
   plugins: [
     new CopyPlugin({
       patterns: [
-        { from: "../../../build/bin/JsMaterialXGenShader.wasm" },
-        { from: "../../../build/bin/JsMaterialXGenShader.js" },
-        { from: "../../../build/bin/JsMaterialXGenShader.data" },
+        { from: "_build/JsMaterialXGenShader.wasm" },
+        { from: "_build/JsMaterialXGenShader.data" },
       ],
     }),
-  ],
-  externals: {
-    JsMaterialX: 'JsMaterialX',
-  }
+    new HtmlWebpackPlugin(),
+  ]
 };
