@@ -186,7 +186,7 @@ In order to avoid conflicting definitions in post.js files, we recommend to wrap
 
 ### Using the EsslShaderGenerator JavaScript bindings
 #### Setup
-Make sure to consume `JsMaterialXGenShader.js` instead of `JsMaterialXCore.js` as described here [here](#consuming-the-module). Additionally, ensure that the app serves `JsMaterialXGenShader.data` and `JsMaterialXGenShader.wasm`. The `.data` file includes the prepacked library files containing the shader snipptets and MaterialX node definitions/implementations required for generating the shader code.
+Make sure to consume `JsMaterialXGenShader.js` instead of `JsMaterialXCore.js` as described [here](#consuming-the-module). Additionally, ensure that the app serves `JsMaterialXGenShader.data` and `JsMaterialXGenShader.wasm`. The `.data` file includes the prepackaged library files containing the shader snippets and MaterialX node definitions/implementations required for generating the shader code.
 
 #### Generating Essl Shader Code & Compiling with WebGL
 To generate WebGL 2 compatible shader code a generator context and an instance of the `EsslShaderGenerator` class is required. 
@@ -194,13 +194,13 @@ To generate WebGL 2 compatible shader code a generator context and an instance o
 const gen = new mx.EsslShaderGenerator();
 const genContext = new mx.GenContext(gen);
 ```
-The standard libraries need to be loaded and imported into the document. This step is required as the standard libraries contain all the definitions and snippests needed for assembly of the shader code.
+The standard libraries need to be loaded and imported into the document. This step is required as the standard libraries contain all the definitions and snippets needed for assembly of the shader code.
 ```javascript
 const stdlib = mx.loadStandardLibraries(genContext);
 const doc = mx.createDocument();
 doc.importLibrary(stdlib);
 ```
-Now it is either time to load a document from a file as outline [here](loading-materialx-files) or create one using the API.
+Now it is either time to load a document from a file as outline [here](#loading-materialx-files) or create one using the API.
 Generating the code consists of finding a renderable element (the javascript binding returns the first renderable element) and calling the `generate` method from the `EsslShaderGenerator` class. The shader code for the vertex/pixel shader may be requested from the resulting `Shader` instance.
 ```javascript
 const elem = mx.findRenderableElement(doc);
@@ -208,7 +208,7 @@ const shader = gen.generate(elem.getNamePath(), elem, genContext);
 const fShader = shader.getSourceCode("pixel");    
 const vShader = shader.getSourceCode("vertex");
 ```
-Shader generation options may be changed by getting the options from the context and altering its properties. Changes to these options must occur after ther standard libraries have been loaded as the call to `mx.loadStandardLibraries(genContext)` sets the options to some defaults.
+Shader generation options may be changed by getting the options from the context and altering its properties. Changes to these options must occur after the standard libraries have been loaded as the call to `mx.loadStandardLibraries(genContext)` sets the options to some defaults.
 ```javascript
 genContext.getOptions().fileTextureVerticalFlip = false;
 ```
@@ -224,7 +224,7 @@ gl.compileShader(glPixelShader);
 However, any rendering framework that supports custom shaders should do. In the [JsMaterialXView sample app](./JsMaterialXView/src/index.js) we use the [RawShaderMaterial](https://threejs.org/docs/index.html?q=RawSh#api/en/materials/RawShaderMaterial) class from [three.js](https://threejs.org/).
 
 #### Getting the shader uniforms
-The uniform values can be obtained from the shader as a JSON, either for the vertex or the pixl shader.
+The uniform values can be obtained from the shader as a JSON, either for the vertex or the pixel shader.
 ```javascript
 shader.getUniformValues("vertex");
 shader.getUniformValues("pixel")
